@@ -182,29 +182,31 @@ contract('SpankBank', (accounts) => {
 
     // verify staker-specific state transitions
     for (let [index, staker] of stakers.entries()) {
+
       // stakers[staker.address] -> Staker
       const bankedStaker = await spankbank.stakers(staker.address)
-      console.log('=== DEBUG: '+JSON.stringify(bankedStaker)); // TODO remove
-      const {totalSpank, delegateKey, bootyBase} = bankedStaker // TODO fix verifying specific stakes or all stakes
+      const stakeIds = await spankbank.getStakeIds(staker.address)
+      const stake = await spankbank.stakes(stakeIds[0]) // TODO we currently assume there is only one stake per staker as this was the test setup until now!
+
+      console.log('DEBUG: Stake: '+JSON.stringify(stake))
+      console.log('DEBUG: Staker: '+JSON.stringify(bankedStaker))
+
+      const {totalSpank, delegateKey, bootyBase} = bankedStaker
       assert.equal(+totalSpank, staker.stake)
       // staking during period 0 -> starting period = 1
-      assert.equal(+startingPeriod, nextPeriod)
-      // staking during period 0 -> ending period = 12
-      assert.equal(+endingPeriod, currentPeriod + staker.periods)
+      assert.equal(+stake.startingPeriod, currentPeriod)
+      // staking during period 0 -> ending period = 11
+      assert.equal(+stake.endingPeriod, currentPeriod + staker.periods - 1)
       assert.equal(delegateKey, staker.delegateKey)
       assert.equal(bootyBase, staker.bootyBase)
 
-      // staker spankpoints for next period
-      const spankPoints = await spankbank.getSpankPoints.call(staker.address, nextPeriod)
+      // staker spankpoints for current period
+      const spankPoints = await spankbank.getSpankPoints.call(staker.address, currentPeriod)
       assert.equal(+spankPoints, calcSpankPoints(staker.periods, staker.stake))
 
       // didClaimBooty default false - current period
       const didClaimBooty_current = await spankbank.getDidClaimBooty.call(staker.address, currentPeriod)
       assert.equal(didClaimBooty_current, false)
-
-      // didClaimBooty default false - next period
-      const didClaimBooty_next = await spankbank.getDidClaimBooty.call(staker.address, nextPeriod)
-      assert.equal(didClaimBooty_next, false)
 
       // user SPANK decreased (assumes all SPANK is staked)
       const stakerSpankBalance = await spankToken.balanceOf(staker.address)
@@ -218,7 +220,7 @@ contract('SpankBank', (accounts) => {
       if (txs) {
         const event = getEventParams(txs[index], 'StakeEvent')
         assert.equal(event.staker, staker.address)
-        assert.equal(+event.period, nextPeriod)
+        assert.equal(+event.period, currentPeriod)
         assert.equal(+event.spankPoints, +spankPoints)
         assert.equal(+event.spankAmount, staker.stake)
         assert.equal(+event.stakePeriods, staker.periods)
@@ -239,8 +241,8 @@ contract('SpankBank', (accounts) => {
     const totalSpankStaked = await spankToken.balanceOf.call(spankbank.address)
     assert.equal(+totalSpankStaked, expectedTotalSpankStaked)
 
-    // total spankpoints for next period
-    const {totalSpankPoints} = await spankbank.periods(nextPeriod)
+    // total spankpoints for current period
+    const {totalSpankPoints} = await spankbank.periods(currentPeriod)
     assert.equal(+totalSpankPoints, expectedTotalSpankPoints)
 
     // spankBank SPANK increased
@@ -402,17 +404,17 @@ contract('SpankBank', (accounts) => {
     })
   })
 
-  // describe('Staking has ten requirements (counting logical AND requirements individually when possible).\n\t1. stake period greater than zero \n\t2. stake period less than or equal to maxPeriods \n\t3. stake greater than zero \n\t4. startingPeriod is zero \n\t5. transfer complete \n\t6. delegateKey is not 0x0 \n\t7. bootyBase is not 0x0 \n\t8. delegateKey -> stakerAddress is 0x0\n\t9. SpankBankIsOpen modifier\n\t10. proper receiveApproval caller\n', () => {
+  describe('Staking has ten requirements (counting logical AND requirements individually when possible).\n\t1. stake period greater than zero \n\t2. stake period less than or equal to maxPeriods \n\t3. stake greater than zero \n\t4. startingPeriod is zero \n\t5. transfer complete \n\t6. delegateKey is not 0x0 \n\t7. bootyBase is not 0x0 \n\t8. delegateKey -> stakerAddress is 0x0\n\t9. SpankBankIsOpen modifier\n\t10. proper receiveApproval caller\n', () => {
 
-  //   beforeEach(async () => {
-  //     await spankToken.transfer(staker1.address, staker1.stake, {from: owner})
-  //     await spankToken.approve(spankbank.address, staker1.stake, {from: staker1.address})
-  //   })
+    beforeEach(async () => {
+      await spankToken.transfer(staker1.address, staker1.stake, {from: owner})
+      await spankToken.approve(spankbank.address, staker1.stake, {from: staker1.address})
+    })
 
-  //   it('0.1 happy case - stake directly + event', async () => {
-  //     const tx = await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
-  //     await verifyStake(staker1, tx)
-  //   })
+    it('0.1 happy case - stake directly + event', async () => {
+      const tx = await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
+      await verifyStake(staker1, tx)
+    })
 
   //   it('0.2 happy case - move forward before staking + event', async () => {
   //     await moveForwardPeriods(1)
@@ -637,7 +639,7 @@ contract('SpankBank', (accounts) => {
   //     // receiveApproval directly
   //     await spankbank.receiveApproval(staker2.address, staker2.stake, spankToken.address, extraData2, {from: staker3.address}).should.be.rejectedWith('invalid receiveApproval caller')
   //   })
-  // })
+  })
 
   // describe('Stake - spankpoints correctly calculated for all periods', () => {
   //   let periodCounter = 1

@@ -21,6 +21,7 @@ contract SpankBank {
     );
 
     event StakeEvent(
+        bytes32 stakeId,
         address staker,
         uint256 period,
         uint256 spankPoints,
@@ -112,29 +113,6 @@ contract SpankBank {
     **************************************/
     uint256 public currentPeriod = 0;
 
-
-    // Todo
-    // add functions specific to Spank object collections which will significantly improve readibility and allows unit testing of the collections
-    // 3 days because of testing. Could speed up with help
-    // Implement multiple stakes per staker
-    // Implement adding to existing stake
-    // Check in for all stakes at the same time
-    // Test all that
-    // 5 days
-    // Use Booty v1 + v2 as total supply for the minting calculation
-    // Change staking to one-month in advance to one-month unstaking period (see screenshot below)
-    // Test
-    // 4 days
-
-    // withdrawStake to use the global bytes32 key as parameter for deletion? Better than uint index within staker's array
-    // stake should be deleted to improve iteration during calculations !! confirm where loops are over stakes !!
-    // for deletion, should there be more keysByStaker, the last entry needs to be swapped and that entry's global key must be regenerated and updated, because it would cause key collision if a new stake is added. Should we generate the key from stomething else??
-
-    // design decisions made around:
-    // - id generation for stake. hash(staker+index) or hash(staker+now)? Decision: use of blocktime. Comes with the limitation that two stakes for the same staker/delegate cannot be created within the same block. Use of the index would add extra gas cost as the key would have to be recalculated upon stake deletion
-    // 
-
-
     mapping(bytes32 => Spank.Stake) public stakes;
     mapping(address => Spank.Staker) public stakers;
     mapping(uint256 => Spank.Period) public periods;
@@ -202,7 +180,7 @@ contract SpankBank {
      * @param bootyBase - the address to which claimed booty is sent (optional, if staker already registered)
      */ 
     function stake(uint256 spankAmount, uint256 stakePeriods, address delegateKey, address bootyBase) SpankBankIsOpen public {
-        doStake(msg.sender, spankAmount, stakePeriods, delegateKey, bootyBase);
+        return doStake(msg.sender, spankAmount, stakePeriods, delegateKey, bootyBase);
     }
 
     function doStake(address stakerAddress, uint256 spankAmount, uint256 stakePeriods, address delegateKey, address bootyBase) internal {
@@ -215,6 +193,7 @@ contract SpankBank {
         require(spankToken.transferFrom(stakerAddress, this, spankAmount));
 
         // the new stake ID is generated from the staker address and the position index in the array of stakes
+        // this will not cause any hash collisions as long as no stakes are deleted
         bytes32 stakeId = keccak256(abi.encodePacked(stakerAddress, stakers[stakerAddress].stakes.length));
 
         // a Staker cannot exist without at least one stake, so we use that to detect a new Staker to be created
@@ -231,11 +210,12 @@ contract SpankBank {
         stakers[stakerAddress].totalSpank = SafeMath.add(stakers[stakerAddress].totalSpank, spankAmount);
         stakes[stakeId] = Spank.Stake(spankAmount, currentPeriod, currentPeriod + stakePeriods - 1, 0);
 
-        _applyStakeToCurrentPeriod(stakerAddress, stakeId);
+        _applyStakeToCurrentPeriod(stakerAddress, stakeId, stakePeriods);
 
         totalSpankStaked = SafeMath.add(totalSpankStaked, spankAmount);
 
         emit StakeEvent(
+            stakeId,
             stakerAddress,
             currentPeriod,
             stakers[stakerAddress].spankPoints[currentPeriod],
@@ -244,15 +224,15 @@ contract SpankBank {
             delegateKey,
             bootyBase
         );
+
     }
 
     // Called during stake and checkIn, assumes those functions prevent duplicate calls
     // for the same staker.
-    function _applyStakeToCurrentPeriod(address stakerAddress, bytes32 stakeId) internal {
+    function _applyStakeToCurrentPeriod(address stakerAddress, bytes32 stakeId, uint256 stakePeriods) internal {
         Spank.Staker storage staker = stakers[stakerAddress];
         Spank.Stake storage stk = stakes[stakeId];
 
-        uint256 stakePeriods = stk.endingPeriod - currentPeriod;
         uint256 stakerPoints = SafeMath.div(SafeMath.mul(stk.spankStaked, pointsTable[stakePeriods]), 100);
 
         // add staker spankpoints to total spankpoints for this period
@@ -359,7 +339,8 @@ contract SpankBank {
                 require(updatedEndingPeriods[i] < currentPeriod + maxPeriods, "updatedEndingPeriod greater than currentPeriod and maxPeriods");
                 stk.endingPeriod = updatedEndingPeriods[i];
             }
-            _applyStakeToCurrentPeriod(stakerAddress, stakeId);
+            uint256 stakePeriods = stk.endingPeriod - currentPeriod;
+            _applyStakeToCurrentPeriod(stakerAddress, stakeId, stakePeriods);
             emit CheckInEvent(stakerAddress, currentPeriod, staker.spankPoints[currentPeriod], stk.endingPeriod);
         }
     }
@@ -497,5 +478,9 @@ contract SpankBank {
 
     function getStakerFromDelegateKey(address delegateAddress) public view returns (address) {
         return stakerByDelegateKey[delegateAddress];
+    }
+
+    function getStakeIds(address stakerAddress) public view returns (bytes32[]) {
+        return stakers[stakerAddress].stakes;
     }
 }
