@@ -43,9 +43,10 @@ contract SpankBank {
 
     event CheckInEvent (
         address staker,
+        bytes32 stakeId,
         uint256 period,
         uint256 spankPoints,
-        uint256 stakerEndingPeriod
+        uint256 stakeEndingPeriod
     );
 
     event ClaimBootyEvent (
@@ -208,7 +209,7 @@ contract SpankBank {
 
         stakers[stakerAddress].stakes.push(stakeId);
         stakers[stakerAddress].totalSpank = SafeMath.add(stakers[stakerAddress].totalSpank, spankAmount);
-        stakes[stakeId] = Spank.Stake(spankAmount, currentPeriod, currentPeriod + stakePeriods - 1, 0);
+        stakes[stakeId] = Spank.Stake(stakerAddress, spankAmount, currentPeriod, currentPeriod + stakePeriods - 1, 0);
 
         _applyStakeToCurrentPeriod(stakerAddress, stakeId, stakePeriods);
 
@@ -314,25 +315,21 @@ contract SpankBank {
      * Example: Staker has 5 stakes. Calling `checkIn([0,3], [38,0])` will perform a check-in
      * on stakes 1 and 4 with the ending period of stake 4 being set to period 38.
      *
-     * @param stakeIndexes - an array of indexes (starting with 0) which of the staker's stakes to update
-     * @param updatedEndingPeriods - an array of updated ending periods. A 0-value indicates no update
+     * @param stakeIds - an array of Stake IDs for which the staker would like to check in
+     * @param updatedEndingPeriods - an array of updated ending periods matching the indexes of the stakeIds. A 0-value indicates no update for that stake.
      */
-    function checkIn(uint256[] stakeIndexes, uint256[] updatedEndingPeriods) SpankBankIsOpen public {
+    function checkIn(bytes32[] stakeIds, uint256[] updatedEndingPeriods) SpankBankIsOpen public {
         updatePeriod();
 
         address stakerAddress =  stakerByDelegateKey[msg.sender];
         Spank.Staker storage staker = stakers[stakerAddress];
 
-        // TODO using the stake indexes as parameter is not ideal. Too much can go wrong from a client's perspective. Using the stakeIds would be better. Q: Can the client's data cache deal with bytes32 hash values properly?
-
-        bytes32 stakeId;
-        for (uint256 i = 0; i < stakeIndexes.length; i++) {
-            require(stakeIndexes[i] < staker.stakes.length, "one of the supplied indexes is out of range of the stakes");
-            stakeId = staker.stakes[stakeIndexes[i]];
-            Spank.Stake storage stk = stakes[stakeId];
-            require(stk.spankStaked > 0, "stake is zero"); // TODO This can never occur as the stake() function requires the stakeAmount to be > 0 already
+        for (uint256 i = 0; i < stakeIds.length; i++) {
+            Spank.Stake storage stk = stakes[stakeIds[i]];
+            require(stk.spankStaked > 0, "stake is zero"); // This can never occur for an existing stake as the stake() function requires the stakeAmount to be > 0, but for check-in it's used to verify the existence of the stake entry
+            require(stk.owner == stakerAddress, "stake has different owner");
             require(currentPeriod <= stk.endingPeriod, "stake is expired");
-            require(stk.lastAppliedToPeriod != currentPeriod, "staker already has points this period");
+            require(stk.lastAppliedToPeriod != currentPeriod, "cannot check-in twice for the same stake and period");
             // If updatedEndingPeriod is 0, don't update the ending period
             if (updatedEndingPeriods[i] > 0) {
                 require(updatedEndingPeriods[i] > stk.endingPeriod, "updatedEndingPeriod less than or equal to stake endingPeriod");
@@ -340,8 +337,8 @@ contract SpankBank {
                 stk.endingPeriod = updatedEndingPeriods[i];
             }
             uint256 stakePeriods = stk.endingPeriod - currentPeriod;
-            _applyStakeToCurrentPeriod(stakerAddress, stakeId, stakePeriods);
-            emit CheckInEvent(stakerAddress, currentPeriod, staker.spankPoints[currentPeriod], stk.endingPeriod);
+            _applyStakeToCurrentPeriod(stakerAddress, stakeIds[i], stakePeriods);
+            emit CheckInEvent(stakerAddress, stakeIds[i], currentPeriod, staker.spankPoints[currentPeriod], stk.endingPeriod);
         }
     }
 

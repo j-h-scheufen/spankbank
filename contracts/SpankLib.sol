@@ -18,6 +18,7 @@ library SpankLib {
     }
 
     struct Stake {
+        address owner; // the staker address
         uint256 spankStaked; // the amount of spank staked
         uint256 startingPeriod; // the period this staker started staking
         uint256 endingPeriod; // the period after which this stake expires

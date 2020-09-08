@@ -178,7 +178,6 @@ contract('SpankBank', (accounts) => {
     }
 
     const currentPeriod = +(await spankbank.currentPeriod())
-    const nextPeriod = currentPeriod + 1
 
     // verify staker-specific state transitions
     for (let [index, staker] of stakers.entries()) {
@@ -187,11 +186,8 @@ contract('SpankBank', (accounts) => {
       const bankedStaker = await spankbank.stakers(staker.address)
       const stakeIds = await spankbank.getStakeIds(staker.address)
       const stake = await spankbank.stakes(stakeIds[0]) // TODO we currently assume there is only one stake per staker as this was the test setup until now!
-
-      console.log('DEBUG: Stake: '+JSON.stringify(stake))
-      console.log('DEBUG: Staker: '+JSON.stringify(bankedStaker))
-
       const {totalSpank, delegateKey, bootyBase} = bankedStaker
+      
       assert.equal(+totalSpank, staker.stake)
       // staking during period 0 -> starting period = 1
       assert.equal(+stake.startingPeriod, currentPeriod)
@@ -416,533 +412,539 @@ contract('SpankBank', (accounts) => {
       await verifyStake(staker1, tx)
     })
 
-  //   it('0.2 happy case - move forward before staking + event', async () => {
-  //     await moveForwardPeriods(1)
-  //     const tx = await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
+    it('0.2 happy case - move forward before staking + event', async () => {
+      await moveForwardPeriods(1)
+      const tx = await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
 
-  //     await verifyStake(staker1, tx)
-  //   })
+      await verifyStake(staker1, tx)
+    })
 
-  //   it('0.3 happy case - receive approval', async () => {
-  //     const extraData = makeExtraData(staker1)
-  //     const tx = await spankToken.approveAndCall(spankbank.address, staker1.stake, extraData, {from: staker1.address})
+    it('0.3 happy case - receive approval', async () => {
+      const extraData = makeExtraData(staker1)
+      const tx = await spankToken.approveAndCall(spankbank.address, staker1.stake, extraData, {from: staker1.address})
 
-  //     await verifyStake(staker1)
-  //   })
+      await verifyStake(staker1)
+    })
 
-  //   it('0.4 happy case - multisig stake', async () => {
-  //     await spankToken.transfer(msStaker.address, msStaker.stake, {from: owner})
+    it('0.4 happy case - multisig stake', async () => {
+      await spankToken.transfer(msStaker.address, msStaker.stake, {from: owner})
 
-  //     await multisig.submitTransaction(spankToken.address, 0, multiSigApprove(spankbank.address, msStaker.stake), {from:msStaker.key1})
-  //     approveTx = await multisig.confirmTransaction(0, {from:msStaker.key2})
+      await multisig.submitTransaction(spankToken.address, 0, multiSigApprove(spankbank.address, msStaker.stake), {from:msStaker.key1})
+      approveTx = await multisig.confirmTransaction(0, {from:msStaker.key2})
 
-  //     await multisig.submitTransaction(spankbank.address, 0, multiSigStake(msStaker.stake, msStaker.periods, msStaker.delegateKey, msStaker.bootyBase, {from : msStaker.key1}))
-  //     stakeTx = await multisig.confirmTransaction(1, {from:msStaker.key2})
+      await multisig.submitTransaction(spankbank.address, 0, multiSigStake(msStaker.stake, msStaker.periods, msStaker.delegateKey, msStaker.bootyBase, {from : msStaker.key1}))
+      stakeTx = await multisig.confirmTransaction(1, {from:msStaker.key2})
 
-  //     await verifyStake(msStaker)
-  //   })
+      await verifyStake(msStaker)
+    })
 
-  //   it('0.5 happy case - different delegateKey/bootyBase', async () => {
-  //     staker1.delegateKey = accounts[2]
-  //     staker1.bootyBase = accounts[2]
-  //     await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
+    it('0.5 happy case - different delegateKey/bootyBase', async () => {
+      staker1.delegateKey = accounts[2]
+      staker1.bootyBase = accounts[2]
+      await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
 
-  //     await verifyStake(staker1)
-  //   })
+      await verifyStake(staker1)
+    })
 
-  //   it('0.6 happy case - two stakers + event', async () => {
-  //     const tx1 = await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
+    it('0.6 happy case - two stakers + event', async () => {
+      const tx1 = await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
 
-  //     // must xfer SPANK to staker2 and approve
-  //     await spankToken.transfer(staker2.address, staker2.stake, {from: owner})
-  //     await spankToken.approve(spankbank.address, staker2.stake, {from: staker2.address})
+      // must xfer SPANK to staker2 and approve
+      await spankToken.transfer(staker2.address, staker2.stake, {from: owner})
+      await spankToken.approve(spankbank.address, staker2.stake, {from: staker2.address})
 
-  //     const tx2 = await spankbank.stake(staker2.stake, staker2.periods, staker2.delegateKey, staker2.bootyBase, {from : staker2.address})
+      const tx2 = await spankbank.stake(staker2.stake, staker2.periods, staker2.delegateKey, staker2.bootyBase, {from : staker2.address})
 
-  //     await verifyStake([staker1, staker2], [tx1, tx2])
-  //   })
+      await verifyStake([staker1, staker2], [tx1, tx2])
+    })
 
-  //   it('0.7 happy case - two stakers, both using receive approval', async () => {
-  //     const extraData1 = makeExtraData(staker1)
-  //     await spankToken.approveAndCall(spankbank.address, staker1.stake, extraData1, {from: staker1.address})
+    it('0.7 happy case - two stakers, both using receive approval', async () => {
+      const extraData1 = makeExtraData(staker1)
+      await spankToken.approveAndCall(spankbank.address, staker1.stake, extraData1, {from: staker1.address})
 
-  //     // must xfer SPANK to staker2
-  //     await spankToken.transfer(staker2.address, staker2.stake, {from: owner})
+      // must xfer SPANK to staker2
+      await spankToken.transfer(staker2.address, staker2.stake, {from: owner})
 
-  //     const extraData2 = makeExtraData(staker2)
-  //     await spankToken.approveAndCall(spankbank.address, staker2.stake, extraData2, {from: staker2.address})
+      const extraData2 = makeExtraData(staker2)
+      await spankToken.approveAndCall(spankbank.address, staker2.stake, extraData2, {from: staker2.address})
 
-  //     await verifyStake([staker1, staker2])
-  //   })
+      await verifyStake([staker1, staker2])
+    })
 
-  //   it('0.8 edge case - doStake fails when called from external account', async () => {
-  //     try {
-  //       // if *internal* is removed, doStake will succeed
-  //       await spankbank.doStake(staker1.address, staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
+    it('0.8 edge case - doStake fails when called from external account', async () => {
+      try {
+        // if *internal* is removed, doStake will succeed
+        await spankbank.doStake(staker1.address, staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
 
-  //       await verifyStake(staker1)
-  //       throw new Error('doStake succeeded')
-  //     } catch (err) {
-  //       assert.equal(err, 'TypeError: spankbank.doStake is not a function')
-  //     }
-  //   })
+        await verifyStake(staker1)
+        throw new Error('doStake succeeded')
+      } catch (err) {
+        assert.equal(err, 'TypeError: spankbank.doStake is not a function')
+      }
+    })
 
-  //   it('0.9 edge case - _updateNextPeriodPoints fails when called from external account', async () => {
-  //     try {
-  //       await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
-  //       await verifyStake(staker1)
+    it('0.9 edge case - _updateNextPeriodPoints fails when called from external account', async () => {
+      try {
+        const tx = await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
+        const {stakeId} = getEventParams(tx, 'StakeEvent')
 
-  //       const originalPoints = calcSpankPoints(staker1.periods, staker1.stake)
+        await verifyStake(staker1)
 
-  //       // we attempt to improperly update the spankpoints for a staker
-  //       // this will also increment the totalSpankPoints
-  //       staker1.periods = 2
+        const originalPoints = calcSpankPoints(staker1.periods, staker1.stake)
 
-  //       // if *internal* is removed, _updateNextPeriodPoints will succeed
-  //       await spankbank._updateNextPeriodPoints(staker1.address, staker1.periods, {from : staker1.address})
+        // we attempt to improperly update the spankpoints for a staker
+        // this will also increment the totalSpankPoints
+        staker1.periods = 2
 
-  //       nextPeriod = +(await spankbank.currentPeriod()) + 1
+        // if *internal* is removed, _applyStakeToCurrentPeriod will succeed
+        await spankbank._applyStakeToCurrentPeriod(staker1.address, stakeId, staker1.periods, {from : staker1.address})
 
-  //       // staker spankpoints for next period
-  //       const spankPoints = await spankbank.getSpankPoints.call(staker1.address, nextPeriod)
-  //       assert.equal(+spankPoints, calcSpankPoints(staker1.periods, staker1.stake))
+        // staker spankpoints for this period
+        const spankPoints = await spankbank.getSpankPoints.call(staker1.address, currentPeriod)
+        assert.equal(+spankPoints, calcSpankPoints(staker1.periods, staker1.stake))
 
-  //       // total spankpoints for next period
-  //       const [_, totalSpankPoints] = await spankbank.periods(nextPeriod)
-  //       assert.equal(+totalSpankPoints, +spankPoints + originalPoints)
+        // total spankpoints for this period
+        const [_, totalSpankPoints] = await spankbank.periods(currentPeriod) // TODO not sure if this is still testing the intended ...
+        assert.equal(+totalSpankPoints, +spankPoints + originalPoints)
 
-  //       throw new Error('_updateNextPeriodPoints succeeded')
-  //     } catch (err) {
-  //       assert.equal(err, 'TypeError: spankbank._updateNextPeriodPoints is not a function')
-  //     }
-  //   })
+        throw new Error('_applyStakeToCurrentPeriod succeeded')
+      } catch (err) {
+        assert.equal(err, 'TypeError: spankbank._applyStakeToCurrentPeriod is not a function')
+      }
+    })
 
-  //   it('1. stake periods is zero', async () => {
-  //     staker1.periods = 0
+    it('1. stake periods is zero', async () => {
+      staker1.periods = 0
 
-  //     await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address}).should.be.rejectedWith('stake not between zero and maxPeriods')
-  //   })
+      await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address}).should.be.rejectedWith('stake not between zero and maxPeriods')
+    })
 
-  //   it('2. stake periods is greater than maxPeriods', async () => {
-  //     staker1.periods = 13
+    it('2. stake periods is greater than maxPeriods', async () => {
+      staker1.periods = 13
 
-  //     await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address}).should.be.rejectedWith('stake not between zero and maxPeriods')
-  //   })
+      await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address}).should.be.rejectedWith('stake not between zero and maxPeriods')
+    })
 
-  //   it('3. stake amount is zero', async () => {
-  //     staker1.stake = 0
+    it('3. stake amount is zero', async () => {
+      staker1.stake = 0
 
-  //     await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address}).should.be.rejectedWith('stake is 0')
-  //   })
+      await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address}).should.be.rejectedWith('stake is 0')
+    })
 
-  //   it('4/(8). startingPeriod is not zero (staker delegateKey also exists)', async () => {
-  //     await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
+    it('5.1 transfer failure - insufficient balance', async () => {
+      await spankToken.transfer(owner, staker1.stake, {from: staker1.address})
 
-  //     await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address}).should.be.rejectedWith('staker already exists')
-  //   })
+      await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address}).should.be.rejectedWith(SolRevert)
+    })
 
-  //   it('5.1 transfer failure - insufficient balance', async () => {
-  //     await spankToken.transfer(owner, staker1.stake, {from: staker1.address})
+    it('5.2 transfer failure - staker never approved', async () => {
+      await spankToken.transfer(staker2.address, staker2.stake, {from: owner})
 
-  //     await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address}).should.be.rejectedWith(SolRevert)
-  //   })
+      await spankbank.stake(staker2.stake, staker2.periods, staker2.delegateKey, staker2.bootyBase, {from : staker2.address}).should.be.rejectedWith(SolRevert)
+    })
 
-  //   it('5.2 transfer failure - staker never approved', async () => {
-  //     await spankToken.transfer(staker2.address, staker2.stake, {from: owner})
+    it('6. staker delegate key is 0x0', async () => {
+      staker1.delegateKey = "0x0000000000000000000000000000000000000000"
 
-  //     await spankbank.stake(staker2.stake, staker2.periods, staker2.delegateKey, staker2.bootyBase, {from : staker2.address}).should.be.rejectedWith(SolRevert)
-  //   })
+      await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address}).should.be.rejectedWith('delegateKey does not exist')
+    })
 
-  //   it('6. staker delegate key is 0x0', async () => {
-  //     staker1.delegateKey = "0x0000000000000000000000000000000000000000"
+    it('7. staker bootyBase is 0x0', async () => {
+      staker1.bootyBase = "0x0000000000000000000000000000000000000000"
 
-  //     await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address}).should.be.rejectedWith('delegateKey does not exist')
-  //   })
+      await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address}).should.be.rejectedWith('bootyBase does not exist')
+    })
 
-  //   it('7. staker bootyBase is 0x0', async () => {
-  //     staker1.bootyBase = "0x0000000000000000000000000000000000000000"
+    it('8. delegateKey has already been used', async () => {
+      staker1.delegateKey = staker2.delegateKey
 
-  //     await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address}).should.be.rejectedWith('bootyBase does not exist')
-  //   })
+      await spankToken.transfer(staker2.address, staker2.stake, {from: owner})
+      await spankToken.approve(spankbank.address, staker2.stake, {from: staker2.address})
 
-  //   it('8. delegateKey has already been used', async () => {
-  //     staker1.delegateKey = staker2.delegateKey
+      staker2Address = await spankbank.getStakerFromDelegateKey(staker2.delegateKey)
 
-  //     await spankToken.transfer(staker2.address, staker2.stake, {from: owner})
-  //     await spankToken.approve(spankbank.address, staker2.stake, {from: staker2.address})
+      // staker 2 successfully stakes
+      await spankbank.stake(staker2.stake, staker2.periods, staker2.delegateKey, staker2.bootyBase, {from : staker2.address})
 
-  //     staker2Address = await spankbank.getStakerFromDelegateKey(staker2.delegateKey)
+      // confirm staker2 delegateKey lookup -> staker2 address
+      staker2Address = await spankbank.getStakerFromDelegateKey(staker2.delegateKey)
+      assert.equal(staker2Address, staker2.address)
 
-  //     // staker 2 successfully stakes
-  //     await spankbank.stake(staker2.stake, staker2.periods, staker2.delegateKey, staker2.bootyBase, {from : staker2.address})
+      // staker1 staking fails b/c delegateKey is pointing -> staker2
+      await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address}).should.be.rejectedWith('delegateKey already used')
+    })
 
-  //     // confirm staker2 delegateKey lookup -> staker2 address
-  //     staker2Address = await spankbank.getStakerFromDelegateKey(staker2.delegateKey)
-  //     assert.equal(staker2Address, staker2.address)
+    it('9.1 SpankBankIsOpen modifier - cant stake if spankbank is closed', async () => {
+      // same as 0.5 two stakers test but staker1 calls voteToClose
 
-  //     // staker1 staking fails b/c delegateKey is pointing -> staker2
-  //     await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address}).should.be.rejectedWith('delegateKey already used')
-  //   })
+      await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
 
-  //   it('9.1 SpankBankIsOpen modifier - cant stake if spankbank is closed', async () => {
-  //     // same as 0.5 two stakers test but staker1 calls voteToClose
+      await spankbank.voteToClose({from : staker1.address})
 
-  //     await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
+      // must xfer SPANK to staker2 and approve
+      await spankToken.transfer(staker2.address, staker2.stake, {from: owner})
+      await spankToken.approve(spankbank.address, staker2.stake, {from: staker2.address})
 
-  //     await spankbank.voteToClose({from : staker1.address})
+      await spankbank.stake(staker2.stake, staker2.periods, staker2.delegateKey, staker2.bootyBase, {from : staker2.address}).should.be.rejectedWith(SolRevert)
 
-  //     // must xfer SPANK to staker2 and approve
-  //     await spankToken.transfer(staker2.address, staker2.stake, {from: owner})
-  //     await spankToken.approve(spankbank.address, staker2.stake, {from: staker2.address})
+      // only staker1 should have been able to stake
+      await verifyStake([staker1])
+    })
 
-  //     await spankbank.stake(staker2.stake, staker2.periods, staker2.delegateKey, staker2.bootyBase, {from : staker2.address}).should.be.rejectedWith(SolRevert)
+    it('9.2 SpankBankIsOpen modifier - receiveApproval staking fails', async () => {
+      // same as 0.7 two stakers test but staker1 calls voteToClose
 
-  //     // only staker1 should have been able to stake
-  //     await verifyStake([staker1])
-  //   })
+      const extraData1 = makeExtraData(staker1)
+      await spankToken.approveAndCall(spankbank.address, staker1.stake, extraData1, {from: staker1.address})
 
-  //   it('9.2 SpankBankIsOpen modifier - receiveApproval staking fails', async () => {
-  //     // same as 0.7 two stakers test but staker1 calls voteToClose
+      await spankbank.voteToClose({from : staker1.address})
 
-  //     const extraData1 = makeExtraData(staker1)
-  //     await spankToken.approveAndCall(spankbank.address, staker1.stake, extraData1, {from: staker1.address})
+      // must xfer SPANK to staker2
+      await spankToken.transfer(staker2.address, staker2.stake, {from: owner})
 
-  //     await spankbank.voteToClose({from : staker1.address})
+      const extraData2 = makeExtraData(staker2)
+      await spankToken.approveAndCall(spankbank.address, staker2.stake, extraData2, {from: staker2.address}).should.be.rejectedWith(SolRevert)
 
-  //     // must xfer SPANK to staker2
-  //     await spankToken.transfer(staker2.address, staker2.stake, {from: owner})
+      // only staker1 should have been able to stake via receiveApproval
+      await verifyStake([staker1])
+    })
 
-  //     const extraData2 = makeExtraData(staker2)
-  //     await spankToken.approveAndCall(spankbank.address, staker2.stake, extraData2, {from: staker2.address}).should.be.rejectedWith(SolRevert)
+    it('10. receiveApproval with invalid caller', async () => {
+      // If an external UI uses the approve->stake flow, someone else could
+      // intercept the staking flow and call receiveApproval maliciously on
+      // behalf of the staker. We prevent this by requiring that
+      // receiveApproval can only be called by the SPANK ERC20 token contract
+      const extraData1 = makeExtraData(staker1)
+      await spankToken.approveAndCall(spankbank.address, staker1.stake, extraData1, {from: staker1.address})
 
-  //     // only staker1 should have been able to stake via receiveApproval
-  //     await verifyStake([staker1])
-  //   })
+      // must xfer SPANK to staker2 and aprove
+      await spankToken.transfer(staker2.address, staker2.stake, {from: owner})
+      await spankToken.approve(spankbank.address, staker2.stake, {from: staker2.address})
 
-  //   it('10. receiveApproval with invalid caller', async () => {
-  //     // If an external UI uses the approve->stake flow, someone else could
-  //     // intercept the staking flow and call receiveApproval maliciously on
-  //     // behalf of the staker. We prevent this by requiring that
-  //     // receiveApproval can only be called by the SPANK ERC20 token contract
-  //     const extraData1 = makeExtraData(staker1)
-  //     await spankToken.approveAndCall(spankbank.address, staker1.stake, extraData1, {from: staker1.address})
+      // maliciously update periods to 6
+      staker2.periods = 6
+      const extraData2 = makeExtraData(staker2)
 
-  //     // must xfer SPANK to staker2 and aprove
-  //     await spankToken.transfer(staker2.address, staker2.stake, {from: owner})
-  //     await spankToken.approve(spankbank.address, staker2.stake, {from: staker2.address})
-
-  //     // maliciously update periods to 6
-  //     staker2.periods = 6
-  //     const extraData2 = makeExtraData(staker2)
-
-  //     // attempt to stake on behalf of staker2 as staker3 by calling
-  //     // receiveApproval directly
-  //     await spankbank.receiveApproval(staker2.address, staker2.stake, spankToken.address, extraData2, {from: staker3.address}).should.be.rejectedWith('invalid receiveApproval caller')
-  //   })
+      // attempt to stake on behalf of staker2 as staker3 by calling
+      // receiveApproval directly
+      await spankbank.receiveApproval(staker2.address, staker2.stake, spankToken.address, extraData2, {from: staker3.address}).should.be.rejectedWith('invalid receiveApproval caller')
+    })
   })
 
-  // describe('Stake - spankpoints correctly calculated for all periods', () => {
-  //   let periodCounter = 1
+  describe('Stake - spankpoints correctly calculated for all periods', () => {
+    let periodCounter = 1
 
-  //   while(periodCounter <= data.spankbank.maxPeriods) {
-  //     (function() {
-  //       // required bc periodCounter updates, thisPeriod acts as in-scope cache
-  //       let thisPeriod = periodCounter
-  //       describe('stake '+periodCounter+' periods', () => {
-  //         it('spankpoints verified', async () => {
-  //           staker1.periods = thisPeriod
-  //           await spankToken.transfer(staker1.address, staker1.stake, {from: owner})
-  //           await spankToken.approve(spankbank.address, staker1.stake, {from: staker1.address})
-  //           const tx = await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
-  //           await verifyStake(staker1, tx)
-  //         })
-  //       })
-  //     })()
-  //     periodCounter++
-  //   }
-  // })
+    while(periodCounter < data.spankbank.maxPeriods) {
+      (function() {
+        // required bc periodCounter updates, thisPeriod acts as in-scope cache
+        let thisPeriod = periodCounter - 1
+        describe('stake '+periodCounter+' periods', () => {
+          it('spankpoints verified', async () => {
+            staker1.periods = thisPeriod + 1
+            await spankToken.transfer(staker1.address, staker1.stake, {from: owner})
+            await spankToken.approve(spankbank.address, staker1.stake, {from: staker1.address})
+            const tx = await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
+            await verifyStake(staker1, tx)
+          })
+        })
+      })()
+      periodCounter++
+    }
+  })
 
-  // describe('sending fees has three requirements\n\t1. BOOTY amount must be greater than zero\n\t2. transfer complete\n\t3. SpankBankIsOpen modifier\n', () => {
+  describe('sending fees has three requirements\n\t1. BOOTY amount must be greater than zero\n\t2. transfer complete\n\t3. SpankBankIsOpen modifier\n', () => {
 
-  //   // Note: The initialBootySupply is minted and sent to the SpankBank owner
-  //   // (whoever deployed it) during contract deployment.
+    // Note: The initialBootySupply is minted and sent to the SpankBank owner
+    // (whoever deployed it) during contract deployment.
 
-  //   beforeEach(async () => {
-  //     await spankbank.updatePeriod()
-  //     currentPeriod = +(await spankbank.currentPeriod())
-  //   })
+    beforeEach(async () => {
+      await spankbank.updatePeriod()
+      currentPeriod = +(await spankbank.currentPeriod())
+    })
 
-  //   it('0. happy case', async () => {
-  //     const bootyAmount = new BN("1000").mul(e18)
-  //     await bootyToken.approve(spankbank.address, bootyAmount, {from: owner})
-  //     const tx = await spankbank.sendFees(bootyAmount, {from: owner})
-  //     const sendFeesEventPayload = getEventParams(tx, "SendFeesEvent")
-  //     assert.equal(sendFeesEventPayload.sender, owner)
-  //     assert.equal(+sendFeesEventPayload.bootyAmount, +bootyAmount)
+    it('0. happy case', async () => {
+      const bootyAmount = new BN("1000").mul(e18)
+      await bootyToken.approve(spankbank.address, bootyAmount, {from: owner})
+      const tx = await spankbank.sendFees(bootyAmount, {from: owner})
+      const sendFeesEventPayload = getEventParams(tx, "SendFeesEvent")
+      assert.equal(sendFeesEventPayload.sender, owner)
+      assert.equal(+sendFeesEventPayload.bootyAmount, +bootyAmount)
 
-  //     const totalBootySupply = +(await bootyToken.totalSupply.call()).div(e18)
-  //     assert.equal(totalBootySupply, initialBootySupply - 1000)
+      const totalBootySupply = +(await bootyToken.totalSupply.call()).div(e18)
+      assert.equal(totalBootySupply, initialBootySupply - 1000)
 
-  //     const ownerBootyBalance = +(await bootyToken.balanceOf.call(owner)).div(e18)
-  //     assert.equal(ownerBootyBalance, initialBootySupply - 1000)
+      const ownerBootyBalance = +(await bootyToken.balanceOf.call(owner)).div(e18)
+      assert.equal(ownerBootyBalance, initialBootySupply - 1000)
 
-  //     const {bootyFees} = await spankbank.periods(currentPeriod)
-  //     assert.equal(+bootyFees.div(e18), 1000)
-  //   })
+      const {bootyFees} = await spankbank.periods(currentPeriod)
+      assert.equal(+bootyFees.div(e18), 1000)
+    })
 
-  //   it('1. sending zero amount', async () => {
-  //     await bootyToken.approve(spankbank.address, new BN("1000").mul(e18), {from: owner})
-  //     await spankbank.sendFees(0, {from: owner}).should.be.rejectedWith(SolRevert)
-  //   })
+    it('1. sending zero amount', async () => {
+      await bootyToken.approve(spankbank.address, new BN("1000").mul(e18), {from: owner})
+      await spankbank.sendFees(0, {from: owner}).should.be.rejectedWith(SolRevert)
+    })
 
-  //   it('2.1 transfer failure - insufficient balance', async () => {
-  //     // first approve the booty transfer, but then send away all the booty
-  //     await bootyToken.approve(spankbank.address, new BN("1000").mul(e18), {from: owner})
-  //     await bootyToken.transfer(accounts[1], data.spankbank.initialBootySupply, {from: owner})
+    it('2.1 transfer failure - insufficient balance', async () => {
+      // first approve the booty transfer, but then send away all the booty
+      await bootyToken.approve(spankbank.address, new BN("1000").mul(e18), {from: owner})
+      await bootyToken.transfer(accounts[1], data.spankbank.initialBootySupply, {from: owner})
 
-  //     await spankbank.sendFees(new BN("1000").mul(e18), {from: owner}).should.be.rejectedWith(SolRevert)
-  //   })
+      await spankbank.sendFees(new BN("1000").mul(e18), {from: owner}).should.be.rejectedWith(SolRevert)
+    })
 
-  //   it('2.2 transfer failure - sender didnt approve', async () => {
-  //     await spankbank.sendFees(new BN("1000").mul(e18), {from: owner}).should.be.rejectedWith(SolRevert)
-  //   })
+    it('2.2 transfer failure - sender didnt approve', async () => {
+      await spankbank.sendFees(new BN("1000").mul(e18), {from: owner}).should.be.rejectedWith(SolRevert)
+    })
 
-  //   it('3. SpankBankIsOpen modifier - sendFees fails', async () => {
-  //     // must setup staker, stake, and voteToClose in order to close spankbank
-  //     await spankToken.transfer(staker1.address, staker1.stake, {from: owner})
-  //     await spankToken.approve(spankbank.address, staker1.stake, {from: staker1.address})
-  //     await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
-  //     await verifyStake(staker1)
+    it('3. SpankBankIsOpen modifier - sendFees fails', async () => {
+      // must setup staker, stake, and voteToClose in order to close spankbank
+      await spankToken.transfer(staker1.address, staker1.stake, {from: owner})
+      await spankToken.approve(spankbank.address, staker1.stake, {from: staker1.address})
+      await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
+      await verifyStake(staker1)
 
-  //     await spankbank.voteToClose({from : staker1.address})
+      await spankbank.voteToClose({from : staker1.address})
 
-  //     await bootyToken.approve(spankbank.address, new BN("1000").mul(e18), {from: owner})
-  //     await spankbank.sendFees(new BN("1000").mul(e18), {from: owner}).should.be.rejectedWith(SolRevert)
-  //   })
-  // })
+      await bootyToken.approve(spankbank.address, new BN("1000").mul(e18), {from: owner})
+      await spankbank.sendFees(new BN("1000").mul(e18), {from: owner}).should.be.rejectedWith(SolRevert)
+    })
+  })
 
-  // describe('minting BOOTY has three requirements\n\t1. current period is greater than 0\n\t2. mintingComplete is false for the period\n\t3. SpankBankIsOpen modifier\n', () => {
+  describe('minting BOOTY has three requirements\n\t1. current period is greater than 0\n\t2. mintingComplete is false for the period\n\t3. SpankBankIsOpen modifier\n', () => {
 
-  //   beforeEach(async () => {
-  //     await spankbank.updatePeriod()
-  //     currentPeriod = +(await spankbank.currentPeriod())
-  //   })
+    beforeEach(async () => {
+      await spankbank.updatePeriod()
+      currentPeriod = +(await spankbank.currentPeriod())
+    })
 
-  //   it('0.1 happy case - above target supply -> no new booty', async () => {
-  //     await moveForwardPeriods(1)
-  //     const tx = await spankbank.mintBooty()
-  //     const previousPeriod = +(await spankbank.currentPeriod()) - 1
-  //     const {bootyMinted, mintingComplete} = await spankbank.periods(previousPeriod)
-  //     assert.equal(+bootyMinted, 0)
-  //     assert.equal(mintingComplete, true)
-  //     const mintBootyEventPayload = getEventParams(tx, "MintBootyEvent")
-  //     assert.equal(mintBootyEventPayload, false)
+    it('0.1 happy case - above target supply -> no new booty', async () => {
+      await moveForwardPeriods(1)
+      const tx = await spankbank.mintBooty()
+      const previousPeriod = +(await spankbank.currentPeriod()) - 1
+      const {bootyMinted, mintingComplete} = await spankbank.periods(previousPeriod)
+      assert.equal(+bootyMinted, 0)
+      assert.equal(mintingComplete, true)
+      const mintBootyEventPayload = getEventParams(tx, "MintBootyEvent")
+      assert.equal(mintBootyEventPayload, false)
 
-  //     const totalBootySupply = await bootyToken.totalSupply.call()
-  //     assert.equal(+totalBootySupply, data.spankbank.initialBootySupply)
+      const totalBootySupply = await bootyToken.totalSupply.call()
+      assert.equal(+totalBootySupply, data.spankbank.initialBootySupply)
 
-  //     const spankbankBootyBalance = await bootyToken.balanceOf.call(spankbank.address)
-  //     assert.equal(+spankbankBootyBalance, 0)
-  //   })
+      const spankbankBootyBalance = await bootyToken.balanceOf.call(spankbank.address)
+      assert.equal(+spankbankBootyBalance, 0)
+    })
 
-  //   it('0.2 happy case - below target supply -> new booty minted', async () => {
-  //     const fees = data.spankbank.initialBootySupply
-  //     await bootyToken.approve(spankbank.address, fees, {from: owner})
-  //     await spankbank.sendFees(fees, {from: owner})
-  //     await moveForwardPeriods(1)
-  //     const tx = await spankbank.mintBooty()
-  //     const previousPeriod = +(await spankbank.currentPeriod()) - 1
-  //     const {bootyMinted, mintingComplete} = await spankbank.periods(previousPeriod)
-  //     assert.equal(+bootyMinted, fees * 20) // fees are burned, so we generate 20x
-  //     assert.equal(mintingComplete, true)
+    it('0.2 happy case - below target supply -> new booty minted', async () => {
+      const fees = data.spankbank.initialBootySupply
+      await bootyToken.approve(spankbank.address, fees, {from: owner})
+      await spankbank.sendFees(fees, {from: owner})
+      await moveForwardPeriods(1)
+      const tx = await spankbank.mintBooty()
+      const previousPeriod = +(await spankbank.currentPeriod()) - 1
+      const {bootyMinted, mintingComplete} = await spankbank.periods(previousPeriod)
+      assert.equal(+bootyMinted, fees * 20) // fees are burned, so we generate 20x
+      assert.equal(mintingComplete, true)
 
-  //     const mintBootyEventPayload = getEventParams(tx, "MintBootyEvent")
-  //     assert.equal(+mintBootyEventPayload.targetBootySupply, bootyMinted)
-  //     assert.equal(+mintBootyEventPayload.totalBootySupply, 0)
+      const mintBootyEventPayload = getEventParams(tx, "MintBootyEvent")
+      assert.equal(+mintBootyEventPayload.targetBootySupply, bootyMinted)
+      assert.equal(+mintBootyEventPayload.totalBootySupply, 0)
 
-  //     const totalBootySupply = await bootyToken.totalSupply.call()
-  //     assert.equal(+totalBootySupply, fees * 20)
+      const totalBootySupply = await bootyToken.totalSupply.call()
+      assert.equal(+totalBootySupply, fees * 20)
 
-  //     const spankbankBootyBalance = await bootyToken.balanceOf.call(spankbank.address)
-  //     assert.equal(+spankbankBootyBalance, fees * 20)
-  //   })
+      const spankbankBootyBalance = await bootyToken.balanceOf.call(spankbank.address)
+      assert.equal(+spankbankBootyBalance, fees * 20)
+    })
 
-  //   it('1. minting during period 0', async () => {
-  //     await spankbank.mintBooty().should.be.rejectedWith('current period is zero')
-  //   })
+    it('1. minting during period 0', async () => {
+      await spankbank.mintBooty().should.be.rejectedWith('current period is zero')
+    })
 
-  //   it('2. minting already complete', async () => {
-  //     await moveForwardPeriods(1)
-  //     await spankbank.mintBooty()
-  //     const previousPeriod = +(await spankbank.currentPeriod()) - 1
-  //     const {bootyMinted, mintingComplete} = await spankbank.periods(previousPeriod)
-  //     assert.equal(+bootyMinted, 0)
-  //     assert.equal(mintingComplete, true)
+    it('2. minting already complete', async () => {
+      await moveForwardPeriods(1)
+      await spankbank.mintBooty()
+      const previousPeriod = +(await spankbank.currentPeriod()) - 1
+      const {bootyMinted, mintingComplete} = await spankbank.periods(previousPeriod)
+      assert.equal(+bootyMinted, 0)
+      assert.equal(mintingComplete, true)
 
-  //     await spankbank.mintBooty().should.be.rejectedWith('minting already complete')
-  //   })
+      await spankbank.mintBooty().should.be.rejectedWith('minting already complete')
+    })
 
-  //   it('3 SpankBankIsOpen modifier - mintBooty fails', async () => {
-  //     // must setup staker, stake, and voteToClose in order to close spankbank
-  //     await spankToken.transfer(staker1.address, staker1.stake, {from: owner})
-  //     await spankToken.approve(spankbank.address, staker1.stake, {from: staker1.address})
-  //     await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
-  //     await verifyStake(staker1)
+    it('3 SpankBankIsOpen modifier - mintBooty fails', async () => {
+      // must setup staker, stake, and voteToClose in order to close spankbank
+      await spankToken.transfer(staker1.address, staker1.stake, {from: owner})
+      await spankToken.approve(spankbank.address, staker1.stake, {from: staker1.address})
+      await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
+      await verifyStake(staker1)
 
-  //     await spankbank.voteToClose({from : staker1.address})
+      await spankbank.voteToClose({from : staker1.address})
 
-  //     await moveForwardPeriods(1)
-  //     await spankbank.mintBooty().should.be.rejectedWith(SolRevert)
-  //   })
-  // })
+      await moveForwardPeriods(1)
+      await spankbank.mintBooty().should.be.rejectedWith(SolRevert)
+    })
+  })
 
-  // describe('checking in has six requirements\n\t1. current period is less than the staker.endingPeriod\n\t2. updated ending period is greater than the staker ending period\n\t3. the updated ending period does not exceed max staking periods\n\t4. staker spankpoints for next period is zero\n\t5. SpankBankIsOpen modifier\n\t6. staker.spankStaked > 0\n', () => {
+  describe('checking in has six requirements\n\t1. current period is less than the staker.endingPeriod\n\t2. updated ending period is greater than the staker ending period\n\t3. the updated ending period does not exceed max staking periods\n\t4. staker spankpoints for next period is zero\n\t5. SpankBankIsOpen modifier\n\t6. staker.spankStaked > 0\n', () => {
 
-  //   // Note: if periods = 1, users can not checkIn, they must withdraw and re-stake
+    // Note: if periods = 1, users can not checkIn, they must withdraw and re-stake
 
-  //   beforeEach(async () => {
-  //     await spankToken.transfer(staker1.address, staker1.stake, {from: owner})
-  //     await spankToken.approve(spankbank.address, staker1.stake, {from: staker1.address})
-  //     currentPeriod = +(await spankbank.currentPeriod())
-  //   })
+    beforeEach(async () => {
+      await spankToken.transfer(staker1.address, staker1.stake, {from: owner})
+      await spankToken.approve(spankbank.address, staker1.stake, {from: staker1.address})
+      currentPeriod = +(await spankbank.currentPeriod())
+    })
 
-  //   it('0.1 happy case - dont update endingPeriod', async () => {
-  //     await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
-  //     await moveForwardPeriods(1)
-  //     await spankbank.updatePeriod()
-  //     currentPeriod = +(await spankbank.currentPeriod())
-  //     nextPeriod = currentPeriod + 1
-  //     const tx = await spankbank.checkIn(0, {from: staker1.delegateKey})
+    it('0.1 happy case - dont update endingPeriod', async () => {
+      const stakeTx = await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
+      const {stakeId} = getEventParams(stakeTx, 'StakeEvent')
+      await moveForwardPeriods(1)
+      await spankbank.updatePeriod()
+      currentPeriod = +(await spankbank.currentPeriod())
+      const checkInTx = await spankbank.checkIn([stakeId], [0], {from: staker1.delegateKey})
 
-  //     const bankedStaker = await spankbank.stakers(staker1.address)
-  //     assert.equal(bankedStaker.endingPeriod, currentPeriod + staker1.periods - 1)
+      const stake = await spankbank.stakes(stakeId)
+      assert.equal(+stake.lastAppliedToPeriod, currentPeriod)
+      assert.equal(+stake.endingPeriod, (currentPeriod - 1) + staker1.periods - 1) // stake was started LAST period (currentPeriod - 1)
 
-  //     const spankPoints = await spankbank.getSpankPoints.call(staker1.address, nextPeriod)
-  //     const periodsRemaining = bankedStaker.endingPeriod - currentPeriod
-  //     assert.equal(spankPoints, calcSpankPoints(periodsRemaining, staker1.stake))
+      const spankPoints = await spankbank.getSpankPoints.call(staker1.address, currentPeriod)
+      const periodsRemaining = stake.endingPeriod - currentPeriod
+      assert.equal(spankPoints, calcSpankPoints(periodsRemaining, staker1.stake))
 
-  //     const period = await spankbank.periods(nextPeriod)
-  //     assert.equal(+period.totalSpankPoints, +spankPoints)
+      const period = await spankbank.periods(currentPeriod)
+      assert.equal(+period.totalSpankPoints, +spankPoints)
 
-  //     const checkInEventPayload = getEventParams(tx, "CheckInEvent")
-  //     assert.equal(checkInEventPayload.staker, staker1.address)
-  //     assert.equal(+checkInEventPayload.period, nextPeriod)
-  //     assert.equal(+checkInEventPayload.spankPoints, +spankPoints)
-  //     assert.equal(+checkInEventPayload.stakerEndingPeriod, +bankedStaker.endingPeriod)
-  //   })
+      const checkInEventPayload = getEventParams(checkInTx, "CheckInEvent")
+      assert.equal(checkInEventPayload.staker, staker1.address)
+      assert.equal(checkInEventPayload.stakeId, stakeId)
+      assert.equal(+checkInEventPayload.period, currentPeriod)
+      assert.equal(+checkInEventPayload.spankPoints, +spankPoints)
+      assert.equal(+checkInEventPayload.stakeEndingPeriod, +stake.endingPeriod)
+    })
 
-  //   it('0.2 happy case - update endingPeriod', async () => {
-  //     await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
-  //     await moveForwardPeriods(1)
-  //     await spankbank.updatePeriod()
-  //     currentPeriod = +(await spankbank.currentPeriod())
-  //     nextPeriod = currentPeriod + 1
-  //     const bankedStaker_before = await spankbank.stakers(staker1.address)
-  //     const updatedEndingPeriod = +bankedStaker_before.endingPeriod + 1
+    it('0.2 happy case - update endingPeriod', async () => {
+      const stakeTx = await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
+      const {stakeId} = getEventParams(stakeTx, 'StakeEvent')
+      await moveForwardPeriods(1)
+      await spankbank.updatePeriod()
+      currentPeriod = +(await spankbank.currentPeriod())
 
-  //     const tx = await spankbank.checkIn(updatedEndingPeriod, {from: staker1.delegateKey})
+      const stake_before = await spankbank.stakes(stakeId)
 
-  //     const bankedStaker = await spankbank.stakers(staker1.address)
-  //     assert.equal(bankedStaker.endingPeriod, currentPeriod + staker1.periods)
+      const checkInTx = await spankbank.checkIn([stakeId], [+stake_before.endingPeriod + 1], {from: staker1.delegateKey})
 
-  //     const spankPoints = await spankbank.getSpankPoints.call(staker1.address, nextPeriod)
-  //     const periodsRemaining = bankedStaker.endingPeriod - currentPeriod
-  //     assert.equal(spankPoints, calcSpankPoints(periodsRemaining, staker1.stake))
+      const stake = await spankbank.stakes(stakeId)
+      assert.equal(+stake.lastAppliedToPeriod, currentPeriod)
+      assert.equal(stake.endingPeriod, (currentPeriod - 1) + staker1.periods) // stake was started LAST period (currentPeriod - 1)
 
-  //     const period = await spankbank.periods(nextPeriod)
-  //     assert.equal(+period.totalSpankPoints, +spankPoints)
+      const spankPoints = await spankbank.getSpankPoints.call(staker1.address, currentPeriod)
+      const periodsRemaining = +stake.endingPeriod - currentPeriod // TODO verify logic here: stake created in 1st, check-in in 2nd with ext by 1, so 11 periods after current = 95% points ..., so is the extension commitment on check-in to be in for 12 periods *after* the checkin on the current period? With the new logic of delayed withdrawal this means effectively 13 periods until I get my stake back
+      assert.equal(+spankPoints, calcSpankPoints(periodsRemaining, staker1.stake))
 
-  //     const checkInEventPayload = getEventParams(tx, "CheckInEvent")
-  //     assert.equal(checkInEventPayload.staker, staker1.address)
-  //     assert.equal(+checkInEventPayload.period, nextPeriod)
-  //     assert.equal(+checkInEventPayload.spankPoints, +spankPoints)
-  //     assert.equal(+checkInEventPayload.stakerEndingPeriod, +bankedStaker.endingPeriod)
+      const period = await spankbank.periods(currentPeriod)
+      assert.equal(+period.totalSpankPoints, +spankPoints)
 
-  //   })
+      const checkInEventPayload = getEventParams(checkInTx, "CheckInEvent")
+      assert.equal(checkInEventPayload.staker, staker1.address)
+      assert.equal(checkInEventPayload.stakeId, stakeId)
+      assert.equal(+checkInEventPayload.period, currentPeriod)
+      assert.equal(+checkInEventPayload.spankPoints, +spankPoints)
+      assert.equal(+checkInEventPayload.stakeEndingPeriod, +stake.endingPeriod)
 
-  //   it('1. checkIn with expired stake fails', async () => {
-  //     await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
-  //     await moveForwardPeriods(staker1.periods)
-  //     await spankbank.updatePeriod()
-  //     await spankbank.checkIn(0, {from: staker1.delegateKey}).should.be.rejectedWith('staker expired')
-  //   })
+    })
 
-  //   it('2.1 updated ending period is equal to original ending period', async () => {
-  //     await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
-  //     await moveForwardPeriods(1)
-  //     await spankbank.updatePeriod()
-  //     const bankedStaker = await spankbank.stakers(staker1.address)
-  //     await spankbank.checkIn(+bankedStaker.endingPeriod, {from: staker1.delegateKey}).should.be.rejectedWith('updatedEndingPeriod less than or equal to staker endingPeriod')
-  //   })
+    it('1. checkIn with expired stake fails', async () => {
+      const stakeTx = await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
+      const {stakeId} = getEventParams(stakeTx, 'StakeEvent')
+      await moveForwardPeriods(staker1.periods)
+      await spankbank.updatePeriod()
+      await spankbank.checkIn([stakeId], [0], {from: staker1.delegateKey}).should.be.rejectedWith('stake is expired')
+    })
 
-  //   it('2.2 updated ending period is less than original ending period', async () => {
-  //     await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
-  //     await moveForwardPeriods(1)
-  //     await spankbank.updatePeriod()
-  //     const bankedStaker = await spankbank.stakers(staker1.address)
-  //     await spankbank.checkIn(+bankedStaker.endingPeriod - 1, {from: staker1.delegateKey}).should.be.rejectedWith('updatedEndingPeriod less than or equal to staker endingPeriod')
-  //   })
+    it('2.1 updated ending period is equal to original ending period', async () => {
+      const stakeTx = await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
+      const {stakeId} = getEventParams(stakeTx, 'StakeEvent')
+      await moveForwardPeriods(1)
+      await spankbank.updatePeriod()
+      const stake = await spankbank.stakes(stakeId)
+      await spankbank.checkIn([stakeId], [+stake.endingPeriod], {from: staker1.delegateKey}).should.be.rejectedWith('updatedEndingPeriod less than or equal to stake endingPeriod')
+    })
 
-  //   it('3. updated ending period is beyond maximum staking limits', async () => {
-  //     await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
-  //     await moveForwardPeriods(1)
-  //     await spankbank.updatePeriod()
-  //     currentPeriod = +(await spankbank.currentPeriod())
-  //     const updatedEndingPeriod = currentPeriod + data.spankbank.maxPeriods + 1
-  //     await spankbank.checkIn(updatedEndingPeriod, {from: staker1.delegateKey}).should.be.rejectedWith('updatedEndingPeriod greater than currentPeriod and maxPeriods')
-  //   })
+    it('2.2 updated ending period is less than original ending period', async () => {
+      const stakeTx = await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
+      const {stakeId} = getEventParams(stakeTx, 'StakeEvent')
+      await moveForwardPeriods(1)
+      await spankbank.updatePeriod()
+      const stake = await spankbank.stakes(stakeId)
+      await spankbank.checkIn([stakeId], [+stake.endingPeriod - 1], {from: staker1.delegateKey}).should.be.rejectedWith('updatedEndingPeriod less than or equal to stake endingPeriod')
+    })
 
-  //   it('4.1 checkIn during same period as stake fails', async() => {
-  //     await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
-  //     await spankbank.checkIn(0, {from: staker1.delegateKey}).should.be.rejectedWith('staker has points for next period')
-  //   })
+    it('3. updated ending period is beyond maximum staking limits', async () => {
+      const stakeTx = await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
+      const {stakeId} = getEventParams(stakeTx, 'StakeEvent')
+      await moveForwardPeriods(1)
+      await spankbank.updatePeriod()
+      currentPeriod = +(await spankbank.currentPeriod())
+      const updatedEndingPeriod = currentPeriod + data.spankbank.maxPeriods + 1
+      await spankbank.checkIn([stakeId], [updatedEndingPeriod], {from: staker1.delegateKey}).should.be.rejectedWith('updatedEndingPeriod greater than currentPeriod and maxPeriods')
+    })
 
-  //   it('4.2 checkIn twice in same period fails', async() => {
-  //     await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
-  //     await moveForwardPeriods(1)
-  //     await spankbank.updatePeriod()
-  //     await spankbank.checkIn(0, {from: staker1.delegateKey})
-  //     await spankbank.checkIn(0, {from: staker1.delegateKey}).should.be.rejectedWith('staker has points for next period')
-  //   })
+    it('4.1 checkIn during same period as stake fails', async() => {
+      const stakeTx = await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
+      const {stakeId} = getEventParams(stakeTx, 'StakeEvent')
+      await spankbank.checkIn([stakeId], [0], {from: staker1.delegateKey}).should.be.rejectedWith('cannot check-in twice for the same stake and period')
+    })
 
-  //   it('5. SpankBankIsOpen modifier - checkIn fails', async () => {
-  //     await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
-  //     await moveForwardPeriods(1)
-  //     await spankbank.updatePeriod()
-  //     currentPeriod = +(await spankbank.currentPeriod())
-  //     nextPeriod = currentPeriod + 1
+    it('4.2 checkIn twice in same period fails', async() => {
+      const stakeTx = await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
+      const {stakeId} = getEventParams(stakeTx, 'StakeEvent')
+      await moveForwardPeriods(1)
+      await spankbank.updatePeriod()
+      await spankbank.checkIn([stakeId], [0], {from: staker1.delegateKey})
+      await spankbank.checkIn([stakeId], [0], {from: staker1.delegateKey}).should.be.rejectedWith('cannot check-in twice for the same stake and period')
+    })
 
-  //     // same as 0.1 happy case except staker1 calls voteToClose before checkIn
-  //     await spankbank.voteToClose({from : staker1.address})
+    it('5. SpankBankIsOpen modifier - checkIn fails', async () => {
+      const stakeTx = await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
+      const {stakeId} = getEventParams(stakeTx, 'StakeEvent')
+      await moveForwardPeriods(1)
+      await spankbank.updatePeriod()
+      currentPeriod = +(await spankbank.currentPeriod())
 
-  //     await spankbank.checkIn(0, {from: staker1.delegateKey}).should.be.rejectedWith(SolRevert)
-  //   })
+      // same as 0.1 happy case except staker1 calls voteToClose before checkIn
+      await spankbank.voteToClose({from : staker1.address})
 
-  //   it('6.1 checkIn without staking fails', async () => {
-  //     await spankbank.checkIn(0, {from: staker1.delegateKey}).should.be.rejectedWith('staker stake is zero')
-  //   })
+      await spankbank.checkIn([stakeId], [0], {from: staker1.delegateKey}).should.be.rejectedWith(SolRevert)
+    })
+
+    it('6.1 checkIn without staking fails', async () => {
+      await spankbank.checkIn([web3.utils.fromAscii("bogusStakeXXX")], [0], {from: staker1.delegateKey}).should.be.rejectedWith('stake is zero')
+    })
 
   //   it('6.2 checkIn fails - splitStake 100%', async () => {
-  //     await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
+  //     const stakeTx = await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
+  //     const {stakeId} = getEventParams(stakeTx, 'StakeEvent')
   //     await moveForwardPeriods(1)
   //     await spankbank.splitStake(staker2.address, staker2.delegateKey, staker2.bootyBase, staker1.stake, {from: staker1.address})
   //     const spankStaker1 = await spankbank.stakers(staker1.address)
   //     assert.equal(+spankStaker1.spankStaked, 0)
 
-  //     await spankbank.checkIn(0, {from: staker1.delegateKey}).should.be.rejectedWith('staker stake is zero')
+  //     await spankbank.checkIn([stakeId], [0], {from: staker1.delegateKey}).should.be.rejectedWith('staker stake is zero')
   //   })
 
   //   it('6.3 checkIn fails - voteToClose -> withdraw', async () => {
-  //     await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
+  //     const stakeTx = await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
+  //     const {stakeId} = getEventParams(stakeTx, 'StakeEvent')
   //     await moveForwardPeriods(1)
   //     await spankbank.voteToClose({ from: staker1.address })
   //     await spankbank.withdrawStake({ from: staker1.address })
   //     const spankStaker1 = await spankbank.stakers(staker1.address)
   //     assert.equal(+spankStaker1.spankStaked, 0)
 
-  //     await spankbank.checkIn(0, {from: staker1.delegateKey}).should.be.rejectedWith(SolRevert)
+  //     await spankbank.checkIn([stakeId], [0], {from: staker1.delegateKey}).should.be.rejectedWith(SolRevert)
   //   })
-  // })
+  })
 
   // describe('claiming BOOTY has four requirements\n\t1. staker spankpoints > 0 for period\n\t2. staker must not have claimed for claiming period\n\t3. minting of booty must have been completed for the claiming period\n\t4.transfer complete (not verified in tests)\n', () => {
   //   // assumes single staker receiving all minted booty
