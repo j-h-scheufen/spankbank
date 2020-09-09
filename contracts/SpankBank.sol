@@ -51,7 +51,8 @@ contract SpankBank {
 
     event ClaimBootyEvent (
         address staker,
-        uint256 period,
+        uint256 startClaimPeriod,
+        uint256 claimedPeriods,
         uint256 bootyOwed
     );
 
@@ -61,9 +62,10 @@ contract SpankBank {
     );
 
     event SplitStakeEvent (
-        bytes32 stakeId,
-        address staker,
-        address newAddress,
+        bytes32 fromStakeId,
+        bytes32 toStakeId,
+        address fromStaker,
+        address toStaker,
         address newDelegateKey,
         address newBootyBase,
         uint256 spankAmount
@@ -125,6 +127,7 @@ contract SpankBank {
         _;
     }
 
+    // TODO constructor needs the old booty address to consider in total booty supply
     constructor (
         uint256 _periodLength,
         uint256 _maxPeriods,
@@ -182,7 +185,7 @@ contract SpankBank {
      * @param bootyBase - the address to which claimed booty is sent (optional, if staker already registered)
      */ 
     function stake(uint256 spankAmount, uint256 stakePeriods, address delegateKey, address bootyBase) SpankBankIsOpen public {
-        return doStake(msg.sender, spankAmount, stakePeriods, delegateKey, bootyBase);
+        doStake(msg.sender, spankAmount, stakePeriods, delegateKey, bootyBase);
     }
 
     function doStake(address stakerAddress, uint256 spankAmount, uint256 stakePeriods, address delegateKey, address bootyBase) internal {
@@ -344,31 +347,40 @@ contract SpankBank {
         }
     }
 
-    function claimBooty(uint256 claimPeriod) public {
+    /**
+     * @dev Performs a withdrawal of all booty the msg.sender has accumulated since the specified startClaimPeriod up to
+     * and including the last period before the current.
+     *
+     * @param startClaimPeriod - specifies the range of startClaimPeriod - currentPeriod-1 for which booty is being claimed
+     */
+    function claimBooty(uint256 startClaimPeriod) public {
         updatePeriod();
 
-        Spank.Period memory period = periods[claimPeriod];
-        require(period.mintingComplete, "booty not minted");
-
+        require(startClaimPeriod < currentPeriod, "startClaimPeriod must be less than currentPeriod");
         address stakerAddress = stakerByDelegateKey[msg.sender];
-
         Spank.Staker storage staker = stakers[stakerAddress];
-
-        require(!staker.didClaimBooty[claimPeriod], "staker already claimed"); // can only claim booty once // TODO isn't there a better way to claim all your accumulated booty?
-
-        uint256 stakerSpankPoints = staker.spankPoints[claimPeriod];
-        require(stakerSpankPoints > 0, "staker has no points"); // only stakers can claim
-
-        staker.didClaimBooty[claimPeriod] = true;
-
-        uint256 bootyMinted = period.bootyMinted;
-        uint256 totalSpankPoints = period.totalSpankPoints;
-
-        uint256 bootyOwed = SafeMath.div(SafeMath.mul(stakerSpankPoints, bootyMinted), totalSpankPoints);
+        uint256 claimPeriod = startClaimPeriod;
+        uint256 totalBootyOwed;
+        uint256 successClaims; // only used for reporting the number of successful claims in the event
+        Spank.Period memory period;
+        while (claimPeriod < currentPeriod) {
+            period = periods[claimPeriod];
+            require(period.mintingComplete, "booty not minted");
+            if(staker.spankPoints[claimPeriod] > 0) {
+                continue; // skip periods where no points were awarded, i.e. no check-in
+            }
+            require(!staker.didClaimBooty[claimPeriod], "staker already claimed"); // can only claim booty once per period
+            uint256 stakerSpankPoints = staker.spankPoints[claimPeriod];
+            staker.didClaimBooty[startClaimPeriod] = true;
+            uint256 bootyOwed = SafeMath.div(SafeMath.mul(stakerSpankPoints, period.bootyMinted), period.totalSpankPoints);
+            totalBootyOwed = SafeMath.add(totalBootyOwed, bootyOwed);
+            claimPeriod++; // No need for SafeMath since it must be smaller than currentPeriod
+            successClaims++;
+        }
 
         require(bootyToken.transfer(staker.bootyBase, bootyOwed));
 
-        emit ClaimBootyEvent(stakerAddress, claimPeriod, bootyOwed);
+        emit ClaimBootyEvent(stakerAddress, startClaimPeriod, successClaims, totalBootyOwed);
     }
 
     /**
@@ -385,14 +397,13 @@ contract SpankBank {
     function withdrawStake(bytes32[] stakeIds) public {
         updatePeriod();
 
-        address stakerAddress =  stakerByDelegateKey[msg.sender];
-        Spank.Staker storage staker = stakers[stakerAddress];
+        Spank.Staker storage staker = stakers[msg.sender];
 
         uint256 spankToWithdraw = 0;
         for (uint256 i = 0; i < stakeIds.length; i++) {
             Spank.Stake storage stk = stakes[stakeIds[i]];
             require(stk.spankStaked > 0, "stake is zero"); // This can never occur for an existing stake as the stake() function requires the stakeAmount to be > 0, but here it's used to verify the existence of the stake
-            require(stk.owner == stakerAddress, "stake has different owner");
+            require(stk.owner == msg.sender, "stake has different owner");
             require(isClosed || currentPeriod > stk.endingPeriod + 1, "currentPeriod less than waiting period or spankbank closed");
             spankToWithdraw = SafeMath.add(spankToWithdraw, stk.spankStaked);
             staker.totalSpank = SafeMath.sub(staker.totalSpank, stk.spankStaked);
@@ -431,26 +442,25 @@ contract SpankBank {
         require(newAddress != address(0), "newAddress is zero");
         require(spankAmount > 0, "spankAmount is zero");
 
-        address stakerAddress =  stakerByDelegateKey[msg.sender];
         Spank.Stake storage sourceStake = stakes[stakeId];
         require(sourceStake.spankStaked > 0, "stake is zero");
-        require(sourceStake.owner == stakerAddress, "stake has different owner");
-        require(currentPeriod < sourceStake.endingPeriod, "stake expired");
+        require(sourceStake.owner == msg.sender, "stake has different owner");
+        require(currentPeriod <= sourceStake.endingPeriod, "stake is expired");
         require(spankAmount <= sourceStake.spankStaked, "spankAmount greater than stake");
         require(sourceStake.lastAppliedToPeriod < currentPeriod, "stake already applied to current period");
 
         // a Staker cannot exist without at least one stake, so we use that to detect a new Staker to be created
         if (stakers[newAddress].stakes.length == 0) {
-            require(newDelegateKey != address(0), "newDelegateKey is zero");
-            require(newBootyBase != address(0), "newBootyBase is zero");
-            require(stakerByDelegateKey[newDelegateKey] == address(0), "newDelegateKey already used");
+            require(newDelegateKey != address(0), "delegateKey is zero");
+            require(newBootyBase != address(0), "bootyBase is zero");
+            require(stakerByDelegateKey[newDelegateKey] == address(0), "delegateKey already used");
             bytes32[] memory stakeIDs;
             stakers[newAddress] = Spank.Staker(0, newDelegateKey, newBootyBase, stakeIDs); // initialize totalSpank as 0. spankAmount is added below
             stakerByDelegateKey[newDelegateKey] = newAddress;
         }
 
         bytes32 newStakeId = keccak256(abi.encodePacked(newAddress, stakers[newAddress].stakes.length));
-        Spank.Staker storage staker = stakers[stakerAddress];
+        Spank.Staker storage staker = stakers[msg.sender];
         sourceStake.spankStaked = SafeMath.sub(sourceStake.spankStaked, spankAmount);
         staker.totalSpank = SafeMath.sub(staker.totalSpank, spankAmount);
 
@@ -458,7 +468,7 @@ contract SpankBank {
         stakers[newAddress].totalSpank = SafeMath.add(stakers[newAddress].totalSpank, spankAmount);
         stakes[newStakeId] = Spank.Stake(newAddress, spankAmount, sourceStake.startingPeriod, sourceStake.endingPeriod, 0);
 
-        emit SplitStakeEvent(newStakeId, stakerAddress, newAddress, newDelegateKey, newBootyBase, spankAmount);
+        emit SplitStakeEvent(stakeId, newStakeId, msg.sender, newAddress, newDelegateKey, newBootyBase, spankAmount);
     }
 
     function voteToClose() public {
@@ -467,7 +477,7 @@ contract SpankBank {
         Spank.Staker storage staker = stakers[msg.sender];
 
         require(staker.totalSpank > 0, "stake is zero");
-        // require(currentPeriod < staker.endingPeriod , "staker expired"); // TODO fix
+        // require(currentPeriod <= staker.endingPeriod , "stake is expired"); // TODO fix
         require(staker.votedToClose[currentPeriod] == false, "stake already voted");
         require(isClosed == false, "SpankBank already closed");
 
