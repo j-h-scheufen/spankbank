@@ -349,6 +349,8 @@ contract SpankBank {
     /**
      * @dev Performs a withdrawal of all booty the msg.sender has accumulated since the specified startClaimPeriod up to
      * and including the last period before the current.
+     * Reverts if
+     * ...
      *
      * @param startClaimPeriod - specifies the range of startClaimPeriod - currentPeriod-1 for which booty is being claimed
      */
@@ -387,7 +389,7 @@ contract SpankBank {
      * e.g. a stake's ending period (in which the stake was available for check-in and points) is followed by a one-period wait time before
      * the stake can be withdrawn. This guarantees that stakers commit their Spank for at least one period and prevents staking and immediate
      * withdrawal in the following period.
-     * Reverts if:
+     * Reverts if
      * - stake does not exist
      * - stake is 
      * 
@@ -420,7 +422,7 @@ contract SpankBank {
      * staker. If the receiving staker is perviously unknown, a new staker will automatically be registered using
      * the delegateKey and bootyBase parameters; for an existing staker, these are optional.
      * The created stake will inherit the starting and ending period attributes of the source stake.
-     * Reverts if:
+     * Reverts if
      * - newAddress is zero address
      * - spankAmount is zero
      * - Spank in the stake is less than split amount
@@ -470,13 +472,30 @@ contract SpankBank {
         emit SplitStakeEvent(stakeId, newStakeId, msg.sender, newAddress, newDelegateKey, newBootyBase, spankAmount);
     }
 
+    /**
+     * @dev Records a vote for the msg.sender staker in favor of closing the SpankBank.
+     * Reverts if:
+     * - the staker has no Spank staked
+     * - the staker has no active (not expired) stakes
+     * - the staker already voted
+     * - the SpankBank was already closed
+     */
     function voteToClose() public {
         updatePeriod();
 
         Spank.Staker storage staker = stakers[msg.sender];
 
         require(staker.totalSpank > 0, "stake is zero");
-        // require(currentPeriod <= staker.endingPeriod , "stake is expired"); // TODO fix
+        // voting requires the staker to have at least one active stake // TODO need to check spankStaked? which would make the totalSpank check above obsolete?
+        bool activeStakes = false;
+        // this is the only 'growing' loop in the bank, but should be ok since it aborts looping as soon as one active stake is found
+        for (uint256 i = 0; i < staker.stakes.length; i++) {
+            if(currentPeriod <= stakes[staker.stakes[i]].endingPeriod) {
+                activeStakes = true;
+                break;
+            }
+        }
+        require(activeStakes , "no active stakes");
         require(staker.votedToClose[currentPeriod] == false, "stake already voted");
         require(isClosed == false, "SpankBank already closed");
 
@@ -520,8 +539,6 @@ contract SpankBank {
     /**
      * @dev Updates the bootyBase associated with the msg.sender staker to the specified one.
      * Reverts if:
-     * - newBootyBase is zero address
-     * - newBootyBase is already in use
      * - staker (msg.sender) does not exist
      *
      * @param newBootyBase - the new delegateKey

@@ -246,6 +246,8 @@ contract('SpankBank', (accounts) => {
     assert.equal(+spankbankSpankBalance, expectedTotalSpankStaked)
   }
 
+  // TODO the following functions are not used and could confuse, because duplicates exist in the relevant describe() sections
+
   // assumes single staker receiving all minted booty
   const verifyClaimBooty = async (staker, fees, claimPeriod) => {
     const didClaimBooty = await spankbank.getDidClaimBooty.call(staker.address, claimPeriod)
@@ -1544,128 +1546,130 @@ contract('SpankBank', (accounts) => {
     })
   })
 
-  // describe('voteToClose has four requires\n\t1. staker spank is greater than zero\n\t2. current period < ending period\n\t3. staker has not already voted to close in current period\n\t4. spankbank is not closed, \n', () => {
+  describe('voteToClose has four requires\n\t1. staker spank is greater than zero\n\t2. current period < ending period\n\t3. staker has not already voted to close in current period\n\t4. spankbank is not closed, \n', () => {
 
-  //   const verifyVoteToCloseEvent = async (tx, staker, period) => {
-  //     const voteToCloseEventPayload = getEventParams(tx, "VoteToCloseEvent")
-  //     assert.equal(voteToCloseEventPayload.staker, staker.address)
-  //     assert.equal(voteToCloseEventPayload.period, period)
-  //   }
+    const verifyVoteToCloseEvent = async (tx, staker, period) => {
+      const voteToCloseEventPayload = getEventParams(tx, "VoteToCloseEvent")
+      assert.equal(voteToCloseEventPayload.staker, staker.address)
+      assert.equal(voteToCloseEventPayload.period, period)
+    }
 
-  //   beforeEach(async () => {
-  //     // reducing this so if staker1 and staker2 are both staking, staker2 can
-  //     // voteToClose without hitting the closingTrigger
-  //     staker2.stake = 50
+    beforeEach(async () => {
+      // reducing this so if staker1 and staker2 are both staking, staker2 can
+      // voteToClose without hitting the closingTrigger
+      staker2.stake = 50
 
-  //     await spankToken.transfer(staker1.address, staker1.stake, {from: owner})
-  //     await spankToken.approve(spankbank.address, staker1.stake, {from: staker1.address})
-  //     await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
+      await spankToken.transfer(staker1.address, staker1.stake, {from: owner})
+      await spankToken.approve(spankbank.address, staker1.stake, {from: staker1.address})
+      const stake1Tx = await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
+      stake1Id = getEventParams(stake1Tx, 'StakeEvent').stakeId
 
-  //     await spankToken.transfer(staker2.address, staker2.stake, {from: owner})
-  //     await spankToken.approve(spankbank.address, staker2.stake, {from: staker2.address})
-  //     await spankbank.stake(staker2.stake, staker2.periods, staker2.delegateKey, staker2.bootyBase, {from : staker2.address})
+      await spankToken.transfer(staker2.address, staker2.stake, {from: owner})
+      await spankToken.approve(spankbank.address, staker2.stake, {from: staker2.address})
+      const stake2Tx = await spankbank.stake(staker2.stake, staker2.periods, staker2.delegateKey, staker2.bootyBase, {from : staker2.address})
+      stake2Id = getEventParams(stake1Tx, 'StakeEvent').stakeId
 
-  //     currentPeriod = +(await spankbank.currentPeriod())
-  //   })
+      currentPeriod = +(await spankbank.currentPeriod())
+    })
 
-  //   it('0.1 voteToClose success - closingTrigger reached', async () => {
-  //     const tx = await spankbank.voteToClose({from : staker1.address})
-  //     await verifyVoteToCloseEvent(tx, staker1, currentPeriod)
+    it('0.1 voteToClose success - closingTrigger reached', async () => {
+      const tx = await spankbank.voteToClose({from : staker1.address})
+      await verifyVoteToCloseEvent(tx, staker1, currentPeriod)
 
-  //     const periodData = await spankbank.periods(currentPeriod)
-  //     const closingVotes = periodData[6]
-  //     assert.equal(+closingVotes, staker1.stake)
+      const periodData = await spankbank.periods(currentPeriod)
+      const closingVotes = periodData[6]
+      assert.equal(+closingVotes, staker1.stake)
 
-  //     const votedToClose = await spankbank.getVote(staker1.address, currentPeriod)
-  //     assert.equal(votedToClose, true)
+      const votedToClose = await spankbank.getVote(staker1.address, currentPeriod)
+      assert.equal(votedToClose, true)
 
-  //     const isClosed = await spankbank.isClosed.call()
-  //     assert.ok(isClosed)
-  //   })
+      const isClosed = await spankbank.isClosed.call()
+      assert.ok(isClosed)
+    })
 
-  //   it('0.2 voteToClose success - closingTrigger not reached', async () => {
-  //     const tx = await spankbank.voteToClose({from : staker2.address})
-  //     await verifyVoteToCloseEvent(tx, staker2, currentPeriod)
+    it('0.2 voteToClose success - closingTrigger not reached', async () => {
+      const tx = await spankbank.voteToClose({from : staker2.address})
+      await verifyVoteToCloseEvent(tx, staker2, currentPeriod)
 
-  //     const periodData = await spankbank.periods(currentPeriod)
-  //     const closingVotes = periodData[6]
-  //     assert.equal(+closingVotes, staker2.stake)
+      const periodData = await spankbank.periods(currentPeriod)
+      const closingVotes = periodData[6]
+      assert.equal(+closingVotes, staker2.stake)
 
-  //     const votedToClose = await spankbank.getVote(staker2.address, currentPeriod)
-  //     assert.equal(votedToClose, true)
+      const votedToClose = await spankbank.getVote(staker2.address, currentPeriod)
+      assert.equal(votedToClose, true)
 
-  //     const isClosed = await spankbank.isClosed.call()
-  //     assert.notOk(isClosed)
-  //   })
+      const isClosed = await spankbank.isClosed.call()
+      assert.notOk(isClosed)
+    })
 
-  //   it('0.3 voteToClose success - closing trigger after 2 votes', async () => {
-  //     const tx1 = await spankbank.voteToClose({from : staker2.address})
-  //     await verifyVoteToCloseEvent(tx1, staker2, currentPeriod)
+    it('0.3 voteToClose success - closing trigger after 2 votes', async () => {
+      const tx1 = await spankbank.voteToClose({from : staker2.address})
+      await verifyVoteToCloseEvent(tx1, staker2, currentPeriod)
 
-  //     const tx2 = await spankbank.voteToClose({from : staker1.address})
-  //     await verifyVoteToCloseEvent(tx2, staker1, currentPeriod)
+      const tx2 = await spankbank.voteToClose({from : staker1.address})
+      await verifyVoteToCloseEvent(tx2, staker1, currentPeriod)
 
-  //     const periodData = await spankbank.periods(currentPeriod)
-  //     const closingVotes = periodData[6]
-  //     assert.equal(+closingVotes, staker1.stake + staker2.stake)
+      const periodData = await spankbank.periods(currentPeriod)
+      const closingVotes = periodData[6]
+      assert.equal(+closingVotes, staker1.stake + staker2.stake)
 
-  //     const votedToClose1 = await spankbank.getVote(staker1.address, currentPeriod)
-  //     assert.equal(votedToClose1, true)
+      const votedToClose1 = await spankbank.getVote(staker1.address, currentPeriod)
+      assert.equal(votedToClose1, true)
 
-  //     const votedToClose2 = await spankbank.getVote(staker2.address, currentPeriod)
-  //     assert.equal(votedToClose2, true)
+      const votedToClose2 = await spankbank.getVote(staker2.address, currentPeriod)
+      assert.equal(votedToClose2, true)
 
-  //     const isClosed = await spankbank.isClosed.call()
-  //     assert.ok(isClosed)
-  //   })
+      const isClosed = await spankbank.isClosed.call()
+      assert.ok(isClosed)
+    })
 
-  //   it('0.4. voteToClose success - penultimate period', async () => {
-  //     await moveForwardPeriods(staker1.periods - 1)
-  //     const tx = await spankbank.voteToClose({from : staker1.address})
-  //     await verifyVoteToCloseEvent(tx, staker1, staker1.periods - 1)
+    it('0.4. voteToClose success - penultimate period', async () => {
+      await moveForwardPeriods(staker1.periods - 1)
+      const tx = await spankbank.voteToClose({from : staker1.address})
+      await verifyVoteToCloseEvent(tx, staker1, staker1.periods - 1)
 
-  //     currentPeriod = +(await spankbank.currentPeriod())
+      currentPeriod = +(await spankbank.currentPeriod())
 
-  //     const periodData = await spankbank.periods(currentPeriod)
-  //     const closingVotes = periodData[6]
-  //     assert.equal(+closingVotes, staker1.stake)
+      const periodData = await spankbank.periods(currentPeriod)
+      const closingVotes = periodData[6]
+      assert.equal(+closingVotes, staker1.stake)
 
-  //     const votedToClose = await spankbank.getVote(staker1.address, currentPeriod)
-  //     assert.equal(votedToClose, true)
+      const votedToClose = await spankbank.getVote(staker1.address, currentPeriod)
+      assert.equal(votedToClose, true)
 
-  //     const isClosed = await spankbank.isClosed.call()
-  //     assert.ok(isClosed)
-  //   })
+      const isClosed = await spankbank.isClosed.call()
+      assert.ok(isClosed)
+    })
 
-  //   it('1.1 voteToClose fails - staker spank is greater than zero - non-staker', async () => {
-  //     await spankbank.voteToClose({from : staker3.address}).should.be.rejectedWith('stake is zero')
-  //   })
+    it('1.1 voteToClose fails - staker spank is greater than zero - non-staker', async () => {
+      await spankbank.voteToClose({from : staker3.address}).should.be.rejectedWith('stake is zero')
+    })
 
-  //   it('1.2 voteToClose fails - staker spank is greater than zero - splitStaked 100% of stake', async () => {
-  //     await moveForwardPeriods(1)
-  //     await spankbank.splitStake(staker3.address, staker3.delegateKey, staker3.bootyBase, staker1.stake, {from: staker1.address})
+    it('1.2 voteToClose fails - staker spank is greater than zero - splitStaked 100% of stake', async () => {
+      await moveForwardPeriods(1)
+      await spankbank.splitStake(stake1Id, staker3.address, staker3.delegateKey, staker3.bootyBase, staker1.stake, {from: staker1.address})
 
-  //     const spankStaker1 = await spankbank.stakers(staker1.address)
-  //     assert.equal(+spankStaker1.spankStaked, 0)
+      const stake1 = await spankbank.stakes(stake1Id)
+      assert.equal(+stake1.spankStaked, 0)
 
-  //     await spankbank.voteToClose({from : staker1.address}).should.be.rejectedWith('stake is zero')
-  //   })
+      await spankbank.voteToClose({from : staker1.address}).should.be.rejectedWith('stake is zero')
+    })
 
-  //   it('2. voteToClose fails - staker is expired', async () => {
-  //     await moveForwardPeriods(staker1.periods)
-  //     await spankbank.voteToClose({from : staker1.address}).should.be.rejectedWith('staker expired')
-  //   })
+    it('2. voteToClose fails - no active stakes', async () => {
+      await moveForwardPeriods(staker1.periods)
+      await spankbank.voteToClose({from : staker1.address}).should.be.rejectedWith('no active stakes')
+    })
 
-  //   it('3. voteToClose fails - staker already voted to close', async () => {
-  //     await spankbank.voteToClose({from : staker1.address})
-  //     await spankbank.voteToClose({from : staker1.address}).should.be.rejectedWith('stake already voted')
-  //   })
+    it('3. voteToClose fails - staker already voted to close', async () => {
+      await spankbank.voteToClose({from : staker1.address})
+      await spankbank.voteToClose({from : staker1.address}).should.be.rejectedWith('stake already voted')
+    })
 
-  //   it('4. voteToClose fails - spankbank is closed', async () => {
-  //     await spankbank.voteToClose({from : staker1.address})
-  //     await spankbank.voteToClose({from : staker2.address}).should.be.rejectedWith('SpankBank already closed')
-  //   })
-  // })
+    it('4. voteToClose fails - spankbank is closed', async () => {
+      await spankbank.voteToClose({from : staker1.address})
+      await spankbank.voteToClose({from : staker2.address}).should.be.rejectedWith('SpankBank already closed')
+    })
+  })
 
   // describe('withdraw stake has two requirements\n\t1. current period must be greater than staker ending period\n\t2. staker.spankStaked > 0\n', () => {
 
