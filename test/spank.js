@@ -1384,91 +1384,91 @@ contract('SpankBank', (accounts) => {
     })
   })
 
-  // describe('updating delegate key has three requirements\n\t1. new delegate key address is not address(0)\n\t2. delegate key is not already in use\n\t3. staker has a valid delegate key to update\n', () => {
+  describe('updating delegate key has three requirements\n\t1. new delegate key address is not address(0)\n\t2. delegate key is not already in use\n\t3. staker has a valid delegate key to update\n', () => {
 
-  //   const verifyUpdateDelegateKey = async (tx, staker, newDelegateKey) => {
-  //     const bankedStaker = await spankbank.stakers(staker.address)
-  //     const updatedDelegateKey = bankedStaker[3]
-  //     assert.equal(updatedDelegateKey, newDelegateKey)
+    const verifyUpdateDelegateKey = async (tx, staker, newDelegateKey) => {
+      const bankedStaker = await spankbank.stakers(staker.address)
+      assert.equal(bankedStaker.delegateKey, newDelegateKey)
 
-  //     const stakerAddress = await spankbank.stakerByDelegateKey.call(newDelegateKey)
-  //     assert.equal(stakerAddress, staker.address)
+      const stakerAddress = await spankbank.stakerByDelegateKey.call(newDelegateKey)
+      assert.equal(stakerAddress, staker.address)
 
-  //     const zeroAddress = await spankbank.stakerByDelegateKey.call(staker.delegateKey)
-  //     assert.equal(zeroAddress, '0x0000000000000000000000000000000000000000')
+      const zeroAddress = await spankbank.stakerByDelegateKey.call(staker.delegateKey)
+      assert.equal(zeroAddress, '0x0000000000000000000000000000000000000000')
 
-  //     //update delegate key event
-  //     const updateDelegateKeyEventPayload = getEventParams(tx, "UpdateDelegateKeyEvent")
-  //     assert.equal(updateDelegateKeyEventPayload.staker, stakerAddress)
-  //     assert.equal(updateDelegateKeyEventPayload.newDelegateKey, newDelegateKey)
-  //   }
+      //update delegate key event
+      const updateDelegateKeyEventPayload = getEventParams(tx, "UpdateDelegateKeyEvent")
+      assert.equal(updateDelegateKeyEventPayload.staker, stakerAddress)
+      assert.equal(updateDelegateKeyEventPayload.newDelegateKey, newDelegateKey)
+    }
 
-  //   beforeEach(async () => {
-  //     newDelegateKey = accounts[2]
-  //     await spankToken.transfer(staker1.address, staker1.stake, {from: owner})
-  //     await spankToken.approve(spankbank.address, staker1.stake, {from: staker1.address})
-  //     await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
-  //   })
+    beforeEach(async () => {
+      newDelegateKey = accounts[2]
+      await spankToken.transfer(staker1.address, staker1.stake, {from: owner})
+      await spankToken.approve(spankbank.address, staker1.stake, {from: staker1.address})
+      const tx = await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
+      stakeId = getEventParams(tx, 'StakeEvent').stakeId;
+    })
 
-  //   it('0.1 successfully update delegateKey', async () => {
-  //     const tx = await spankbank.updateDelegateKey(newDelegateKey, {from: staker1.address})
-  //     await verifyUpdateDelegateKey(tx, staker1, newDelegateKey)
-  //   })
+    it('0.1 successfully update delegateKey', async () => {
+      const tx = await spankbank.updateDelegateKey(newDelegateKey, {from: staker1.address})
+      await verifyUpdateDelegateKey(tx, staker1, newDelegateKey)
+    })
 
-  //   it('0.2 successfully update delegateKey - after spankbank closed', async () => {
-  //     await spankbank.voteToClose({from : staker1.address})
-  //     const isClosed = await spankbank.isClosed.call()
-  //     assert.ok(isClosed)
+    it('0.2 successfully update delegateKey - after spankbank closed', async () => {
+      await spankbank.voteToClose({from : staker1.address})
+      const isClosed = await spankbank.isClosed.call()
+      assert.ok(isClosed)
 
-  //     const tx = await spankbank.updateDelegateKey(newDelegateKey, {from: staker1.address})
-  //     await verifyUpdateDelegateKey(tx, staker1, newDelegateKey)
-  //   })
+      const tx = await spankbank.updateDelegateKey(newDelegateKey, {from: staker1.address})
+      await verifyUpdateDelegateKey(tx, staker1, newDelegateKey)
+    })
 
-  //   it('0.3 successfully update delegateKey - after voteToClose -> withdraw', async () => {
-  //     await spankbank.voteToClose({from : staker1.address})
-  //     await spankbank.withdrawStake({from: staker1.address})
-  //     const spankStaker1 = await spankbank.stakers(staker1.address)
-  //     assert.equal(+spankStaker1.spankStaked, 0)
+    it('0.3 successfully update delegateKey - after voteToClose -> withdraw', async () => {
+      await spankbank.voteToClose({from : staker1.address})
+      await spankbank.withdrawStake([stakeId], {from: staker1.address})
+      const orgStake = await spankbank.stakes(stakeId)
+      assert.equal(+orgStake.spankStaked, 0)
 
-  //     const tx = await spankbank.updateDelegateKey(newDelegateKey, {from: staker1.address})
-  //     await verifyUpdateDelegateKey(tx,staker1, newDelegateKey)
-  //   })
+      const tx = await spankbank.updateDelegateKey(newDelegateKey, {from: staker1.address})
+      await verifyUpdateDelegateKey(tx, staker1, newDelegateKey)
+    })
 
-  //   it('0.4 successfully update delegateKey - after expire -> withdraw', async () => {
-  //     await moveForwardPeriods(staker1.periods + 1)
-  //     await spankbank.withdrawStake({from: staker1.address})
-  //     const spankStaker1 = await spankbank.stakers(staker1.address)
-  //     assert.equal(+spankStaker1.spankStaked, 0)
+    it('0.4 successfully update delegateKey - after expire -> withdraw', async () => {
+      await moveForwardPeriods(staker1.periods + 1)
+      await spankbank.withdrawStake([stakeId], {from: staker1.address})
+      const orgStake = await spankbank.stakes(stakeId)
+      assert.equal(+orgStake.spankStaked, 0)
 
-  //     const tx = await spankbank.updateDelegateKey(newDelegateKey, {from: staker1.address})
-  //     await verifyUpdateDelegateKey(tx,staker1, newDelegateKey)
-  //   })
+      const tx = await spankbank.updateDelegateKey(newDelegateKey, {from: staker1.address})
+      await verifyUpdateDelegateKey(tx, staker1, newDelegateKey)
+    })
 
-  //   it('0.5 successfully update delegateKey - after 100% splitStake', async () => {
-  //     newDelegateKey = accounts[3] // using accounts[2] for splitStake
-  //     await moveForwardPeriods(1)
-  //     await spankbank.splitStake(staker2.address, staker2.delegateKey, staker2.bootyBase, staker1.stake, {from: staker1.address})
-  //     const spankStaker1 = await spankbank.stakers(staker1.address)
-  //     assert.equal(+spankStaker1.spankStaked, 0)
+    it('0.5 successfully update delegateKey - after 100% splitStake', async () => {
+      newDelegateKey = accounts[3] // using accounts[2] for splitStake
+      await moveForwardPeriods(1)
+      await spankbank.splitStake(stakeId, staker2.address, staker2.delegateKey, staker2.bootyBase, staker1.stake, {from: staker1.address})
+      const orgStake = await spankbank.stakes(stakeId)
+      assert.equal(+orgStake.spankStaked, 0)
 
-  //     const tx = await spankbank.updateDelegateKey(newDelegateKey, {from: staker1.address})
-  //     await verifyUpdateDelegateKey(tx,staker1, newDelegateKey)
-  //   })
+      const tx = await spankbank.updateDelegateKey(newDelegateKey, {from: staker1.address})
+      await verifyUpdateDelegateKey(tx, staker1, newDelegateKey)
+    })
 
-  //   it('1. new delegate key address is not address(0)', async () => {
-  //     newDelegateKey = '0x0000000000000000000000000000000000000000'
-  //     await spankbank.updateDelegateKey(newDelegateKey, {from: staker1.address}).should.be.rejectedWith('delegateKey is zero')
-  //   })
+    it('1. new delegate key address is not address(0)', async () => {
+      newDelegateKey = '0x0000000000000000000000000000000000000000'
+      await spankbank.updateDelegateKey(newDelegateKey, {from: staker1.address}).should.be.rejectedWith('delegateKey is zero')
+    })
 
-  //   it('2. delegate key is not already in use', async () => {
-  //     newDelegateKey = staker1.delegateKey
-  //     await spankbank.updateDelegateKey(newDelegateKey, {from: staker1.address}).should.be.rejectedWith('delegateKey already exists')
-  //   })
+    it('2. delegate key is not already in use', async () => {
+      newDelegateKey = staker1.delegateKey
+      await spankbank.updateDelegateKey(newDelegateKey, {from: staker1.address}).should.be.rejectedWith('delegateKey already used')
+    })
 
-  //   it('3. non-stakers cant update delegate keys', async () => {
-  //     await spankbank.updateDelegateKey(newDelegateKey, {from: staker2.address}).should.be.rejectedWith('staker starting period is zero')
-  //   })
-  // })
+    it('3. non-stakers cant update delegate keys', async () => {
+      await spankbank.updateDelegateKey(newDelegateKey, {from: staker2.address}).should.be.rejectedWith('staker does not exist')
+    })
+  })
 
   // describe('updating booty base has one requirement\n\t1. staker must have SPANK staked', () => {
 

@@ -228,7 +228,6 @@ contract SpankBank {
             delegateKey,
             bootyBase
         );
-
     }
 
     // Called during stake and checkIn, assumes those functions prevent duplicate calls
@@ -495,12 +494,21 @@ contract SpankBank {
         emit VoteToCloseEvent(msg.sender, currentPeriod);
     }
 
+    /**
+     * @dev Updates the delegateKey associated with the msg.sender to the specified one.
+     * Reverts if:
+     * - newDelegateKey is zero address
+     * - newDelegateKey is already in use
+     * - staker (msg.sender) does not exist
+     *
+     * @param newDelegateKey - the new delegateKey
+     */
     function updateDelegateKey(address newDelegateKey) public {
         require(newDelegateKey != address(0), "delegateKey is zero");
-        require(stakerByDelegateKey[newDelegateKey] == address(0), "delegateKey already exists");
+        require(stakerByDelegateKey[newDelegateKey] == address(0), "delegateKey already used");
 
         Spank.Staker storage staker = stakers[msg.sender];
-        // require(staker.startingPeriod > 0, "staker starting period is zero"); // TODO fix
+        require(staker.stakes.length > 0, "staker does not exist");
 
         stakerByDelegateKey[staker.delegateKey] = address(0);
         staker.delegateKey = newDelegateKey;
