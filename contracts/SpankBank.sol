@@ -317,7 +317,11 @@ contract SpankBank {
      * Example: Staker has 5 stakes. Calling `checkIn([0,3], [38,0])` will perform a check-in
      * on stakes 1 and 4 with the ending period of stake 4 being set to period 38.
      * Reverts if:
-     * - 
+     * - stake is empty, e.g. because it's been withdrawn or it does not exist
+     * - caller is not the original staker or delegate of the staker
+     * - stake is expired
+     * - a check-in for the current period already happened
+     * - an update for a stake's ending period is less than its current ending period or exceeds currentPeriod + maxPeriods
      *
      * @param stakeIds - an array of Stake IDs for which the staker would like to check in
      * @param updatedEndingPeriods - an array of updated ending periods matching the indexes of the stakeIds. A 0-value indicates no update for that stake.
@@ -330,7 +334,7 @@ contract SpankBank {
 
         for (uint256 i = 0; i < stakeIds.length; i++) {
             Spank.Stake storage stk = stakes[stakeIds[i]];
-            require(stk.spankStaked > 0, "stake is zero"); // This can never occur for an existing stake as the stake() function requires the stakeAmount to be > 0, but here it's used to verify the existence of the stake
+            require(stk.spankStaked > 0, "stake is zero");
             require(stk.owner == stakerAddress, "stake has different owner");
             require(currentPeriod <= stk.endingPeriod, "stake is expired");
             require(stk.lastAppliedToPeriod < currentPeriod, "cannot check-in twice for the same stake and period");
@@ -350,7 +354,7 @@ contract SpankBank {
      * @dev Performs a withdrawal of all booty the msg.sender has accumulated since the specified startClaimPeriod up to
      * and including the last period before the current.
      * Reverts if
-     * ...
+     * // TODO rewrite with bytes32 array to withdraw. keeps more control over the loop and requires all IDs to be active stakes
      *
      * @param startClaimPeriod - specifies the range of startClaimPeriod - currentPeriod-1 for which booty is being claimed
      */
@@ -390,8 +394,9 @@ contract SpankBank {
      * the stake can be withdrawn. This guarantees that stakers commit their Spank for at least one period and prevents staking and immediate
      * withdrawal in the following period.
      * Reverts if
-     * - stake does not exist
-     * - stake is 
+     * - stake is empty, e.g. because it's been withdrawn or it does not exist
+     * - caller is not the original staker
+     * - the waiting period (1 period after stake expiration) has not yet passed
      * 
      * @param stakeIds an array of Stake IDs for which the stake should be withdrawn
      */
@@ -403,9 +408,9 @@ contract SpankBank {
         uint256 spankToWithdraw = 0;
         for (uint256 i = 0; i < stakeIds.length; i++) {
             Spank.Stake storage stk = stakes[stakeIds[i]];
-            require(stk.spankStaked > 0, "stake is zero"); // This can never occur for an existing stake as the stake() function requires the stakeAmount to be > 0, but here it's used to verify the existence of the stake
+            require(isClosed || currentPeriod > stk.endingPeriod + 1, "currentPeriod less than waiting period or spankbank not closed");
+            require(stk.spankStaked > 0, "stake is zero");
             require(stk.owner == msg.sender, "stake has different owner");
-            require(isClosed || currentPeriod > stk.endingPeriod + 1, "currentPeriod less than waiting period or spankbank closed");
             spankToWithdraw = SafeMath.add(spankToWithdraw, stk.spankStaked);
             staker.totalSpank = SafeMath.sub(staker.totalSpank, stk.spankStaked);
             totalSpankStaked = SafeMath.sub(totalSpankStaked, stk.spankStaked);
