@@ -1470,77 +1470,79 @@ contract('SpankBank', (accounts) => {
     })
   })
 
-  // describe('updating booty base has one requirement\n\t1. staker must have SPANK staked', () => {
+  describe('updating booty base has one requirement\n\t1. staker must have SPANK staked', () => {
 
-  //   const verifyUpdateBootyBase = async (tx, staker, newBootyBase) => {
-  //     const bankedStaker = await spankbank.stakers(staker.address)
-  //     const updatedBootyBase = bankedStaker[4]
-  //     assert.equal(updatedBootyBase, newBootyBase)
-  //     const updateBootyBaseEventPayload = getEventParams(tx, "UpdateBootyBaseEvent")
-  //     assert.equal(updateBootyBaseEventPayload.staker, staker.address)
-  //     assert.equal(updateBootyBaseEventPayload.newBootyBase, newBootyBase)
-  //   }
+    const verifyUpdateBootyBase = async (tx, staker, newBootyBase) => {
+      const bankedStaker = await spankbank.stakers(staker.address)
+      const updatedBootyBase = bankedStaker.bootyBase
+      assert.equal(updatedBootyBase, newBootyBase)
+      const updateBootyBaseEventPayload = getEventParams(tx, "UpdateBootyBaseEvent")
+      assert.equal(updateBootyBaseEventPayload.staker, staker.address)
+      assert.equal(updateBootyBaseEventPayload.newBootyBase, newBootyBase)
+    }
 
-  //   beforeEach(async () => {
-  //     newBootyBase = accounts[2]
+    beforeEach(async () => {
+      newBootyBase = accounts[2]
 
-  //     await spankToken.transfer(staker1.address, staker1.stake, {from: owner})
-  //     await spankToken.approve(spankbank.address, staker1.stake, {from: staker1.address})
-  //     await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
-  //   })
+      await spankToken.transfer(staker1.address, staker1.stake, {from: owner})
+      await spankToken.approve(spankbank.address, staker1.stake, {from: staker1.address})
+      const tx = await spankbank.stake(staker1.stake, staker1.periods, staker1.delegateKey, staker1.bootyBase, {from : staker1.address})
+      stakeId = getEventParams(tx, 'StakeEvent').stakeId;
+    })
 
-  //   it('0.1 successfully update bootyBase', async () => {
-  //     const tx = await spankbank.updateBootyBase(newBootyBase, {from: staker1.address})
-  //     await verifyUpdateBootyBase(tx, staker1, newBootyBase)
-  //   })
+    it('0.1 successfully update bootyBase', async () => {
+      const tx = await spankbank.updateBootyBase(newBootyBase, {from: staker1.address})
+      await verifyUpdateBootyBase(tx, staker1, newBootyBase)
+    })
 
-  //   it('0.2 successfully update bootyBase - after spankbank closed', async () => {
-  //     await spankbank.voteToClose({from : staker1.address})
-  //     const isClosed = await spankbank.isClosed.call()
-  //     assert.ok(isClosed)
+    it('0.2 successfully update bootyBase - after spankbank closed', async () => {
+      await spankbank.voteToClose({from : staker1.address})
+      const isClosed = await spankbank.isClosed.call()
+      assert.ok(isClosed)
 
-  //     const tx = await spankbank.updateBootyBase(newBootyBase, {from: staker1.address})
-  //     await verifyUpdateBootyBase(tx, staker1, newBootyBase)
-  //   })
+      const tx = await spankbank.updateBootyBase(newBootyBase, {from: staker1.address})
+      await verifyUpdateBootyBase(tx, staker1, newBootyBase)
+    })
 
-  //   it('0.3 successfully update bootyBase - after voteToClose -> withdraw', async () => {
-  //     await spankbank.voteToClose({from : staker1.address})
-  //     await spankbank.withdrawStake({from: staker1.address})
-  //     const spankStaker1 = await spankbank.stakers(staker1.address)
-  //     assert.equal(+spankStaker1.spankStaked, 0)
+    it('0.3 successfully update bootyBase - after voteToClose -> withdraw', async () => {
+      await spankbank.voteToClose({from : staker1.address})
+      await spankbank.withdrawStake([stakeId], {from: staker1.address})
+      const stake = await spankbank.stakes(stakeId)
+      assert.equal(+stake.spankStaked, 0)
 
-  //     const tx = await spankbank.updateBootyBase(newBootyBase, {from: staker1.address})
-  //     await verifyUpdateBootyBase(tx, staker1, newBootyBase)
-  //   })
+      const tx = await spankbank.updateBootyBase(newBootyBase, {from: staker1.address})
+      await verifyUpdateBootyBase(tx, staker1, newBootyBase)
+    })
 
-  //   it('0.4 successfully update bootyBase - after expire -> withdraw', async () => {
-  //     await moveForwardPeriods(staker1.periods + 1)
-  //     await spankbank.withdrawStake({from: staker1.address})
-  //     const spankStaker1 = await spankbank.stakers(staker1.address)
-  //     assert.equal(+spankStaker1.spankStaked, 0)
+    it('0.4 successfully update bootyBase - after expire -> withdraw', async () => {
+      await moveForwardPeriods(staker1.periods + 1)
+      await spankbank.withdrawStake([stakeId], {from: staker1.address})
+      const stake = await spankbank.stakes(stakeId)
+      assert.equal(+stake.spankStaked, 0)
 
-  //     const tx = await spankbank.updateBootyBase(newBootyBase, {from: staker1.address})
-  //     await verifyUpdateBootyBase(tx, staker1, newBootyBase)
-  //   })
+      const tx = await spankbank.updateBootyBase(newBootyBase, {from: staker1.address})
+      await verifyUpdateBootyBase(tx, staker1, newBootyBase)
+    })
 
-  //   it('0.5 successfully update bootyBase - after 100% splitStake', async () => {
-  //     await moveForwardPeriods(1)
-  //     await spankbank.splitStake(staker2.address, staker2.delegateKey, staker2.bootyBase, staker1.stake, {from: staker1.address})
-  //     const spankStaker1 = await spankbank.stakers(staker1.address)
-  //     assert.equal(+spankStaker1.spankStaked, 0)
+    it('0.5 successfully update bootyBase - after 100% splitStake', async () => {
+      await moveForwardPeriods(1)
+      await spankbank.splitStake(stakeId, staker2.address, staker2.delegateKey, staker2.bootyBase, staker1.stake, {from: staker1.address})
+      const stake = await spankbank.stakes(stakeId)
+      assert.equal(+stake.spankStaked, 0)
 
-  //     const tx = await spankbank.updateBootyBase(newBootyBase, {from: staker1.address})
-  //     await verifyUpdateBootyBase(tx, staker1, newBootyBase)
-  //   })
+      const tx = await spankbank.updateBootyBase(newBootyBase, {from: staker1.address})
+      await verifyUpdateBootyBase(tx, staker1, newBootyBase)
+    })
 
-  //   it('1. must have stake to update booty base', async () => {
-  //     const staker2 = {
-  //       address: accounts[2]
-  //     }
+    // TODO unclear whether this test is meant to verify staker existence or whether the staker has an actual non-zero, active stake?
+    it('1. must have stake to update booty base', async () => {
+      const staker2 = {
+        address: accounts[2]
+      }
 
-  //     await spankbank.updateBootyBase(newBootyBase, {from: staker2.address}).should.be.rejectedWith('staker starting period is zero')
-  //   })
-  // })
+      await spankbank.updateBootyBase(newBootyBase, {from: staker2.address}).should.be.rejectedWith('staker does not exist')
+    })
+  })
 
   // describe('voteToClose has four requires\n\t1. staker spank is greater than zero\n\t2. current period < ending period\n\t3. staker has not already voted to close in current period\n\t4. spankbank is not closed, \n', () => {
 

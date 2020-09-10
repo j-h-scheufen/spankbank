@@ -495,7 +495,7 @@ contract SpankBank {
     }
 
     /**
-     * @dev Updates the delegateKey associated with the msg.sender to the specified one.
+     * @dev Updates the delegateKey associated with the msg.sender staker to the specified one.
      * Reverts if:
      * - newDelegateKey is zero address
      * - newDelegateKey is already in use
@@ -517,9 +517,18 @@ contract SpankBank {
         emit UpdateDelegateKeyEvent(msg.sender, newDelegateKey);
     }
 
+    /**
+     * @dev Updates the bootyBase associated with the msg.sender staker to the specified one.
+     * Reverts if:
+     * - newBootyBase is zero address
+     * - newBootyBase is already in use
+     * - staker (msg.sender) does not exist
+     *
+     * @param newBootyBase - the new delegateKey
+     */
     function updateBootyBase(address newBootyBase) public {
         Spank.Staker storage staker = stakers[msg.sender];
-        // require(staker.startingPeriod > 0, "staker starting period is zero"); // TODO fix
+        require(staker.stakes.length > 0, "staker does not exist");
 
         staker.bootyBase = newBootyBase;
 
