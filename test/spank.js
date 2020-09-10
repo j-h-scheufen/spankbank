@@ -246,69 +246,6 @@ contract('SpankBank', (accounts) => {
     assert.equal(+spankbankSpankBalance, expectedTotalSpankStaked)
   }
 
-  // TODO the following functions are not used and could confuse, because duplicates exist in the relevant describe() sections
-
-  // assumes single staker receiving all minted booty
-  const verifyClaimBooty = async (staker, fees, claimPeriod) => {
-    const didClaimBooty = await spankbank.getDidClaimBooty.call(staker.address, claimPeriod)
-    assert.ok(didClaimBooty)
-
-    const stakerBootyBalance = await bootyToken.balanceOf.call(staker.bootyBase)
-    assert.equal(+stakerBootyBalance, fees * 20)
-
-    const bankBootyBalance = await bootyToken.balanceOf.call(spankbank.address)
-    assert.equal(+bankBootyBalance, 0)
-  }
-
-  const verifyUpdateDelegateKey = async (staker, newDelegateKey) => {
-    const bankedStaker = await spankbank.stakers(staker.address)
-    const updatedDelegateKey = bankedStaker[3]
-    assert.equal(updatedDelegateKey, newDelegateKey)
-
-    const stakerAddress = await spankbank.stakerByDelegateKey.call(newDelegateKey)
-    assert.equal(stakerAddress, staker.address)
-
-    const zeroAddress = await spankbank.stakerByDelegateKey.call(staker.delegateKey)
-    assert.equal(zeroAddress, '0x0000000000000000000000000000000000000000')
-  }
-
-  const verifyUpdateBootyBase = async (staker, newBootyBase) => {
-    const bankedStaker = await spankbank.stakers(staker.address)
-    const updatedBootyBase = bankedStaker[4]
-    assert.equal(updatedBootyBase, newBootyBase)
-  }
-
-  const verifySplitStake = async (staker1, staker2, splitAmount, totalSpankStaked) => {
-    // by default, assumes staker1.stake is totalSpankStaked
-    totalSpankStaked = totalSpankStaked ? totalSpankStaked : staker1.stake
-
-    const bankedStaker1 = await spankbank.stakers(staker1.address)
-    const bankedStaker2 = await spankbank.stakers(staker2.address)
-
-    // spankStaked should be added/subtracted properly
-    assert.equal(+bankedStaker1.spankStaked, staker1.stake - splitAmount)
-    assert.equal(+bankedStaker2.spankStaked, splitAmount)
-
-    // starting period should be same as staker1
-    assert.equal(+bankedStaker1.startingPeriod, +bankedStaker2.startingPeriod)
-
-    // ending period should be same as staker1
-    assert.equal(+bankedStaker1.endingPeriod, +bankedStaker2.endingPeriod)
-
-    // delegateKey and bootyBase are properly set
-    assert.equal(bankedStaker2.delegateKey, staker2.delegateKey)
-    assert.equal(bankedStaker2.bootyBase, staker2.bootyBase)
-
-    // spankBank SPANK remains the same
-    const spankbankSpankBalance = await spankToken.balanceOf(spankbank.address)
-    assert.equal(+spankbankSpankBalance, totalSpankStaked)
-
-    // stakerByDelegateKey -> set
-    const stakerAddress2 = await spankbank.getStakerFromDelegateKey(staker2.delegateKey)
-    assert.equal(stakerAddress2, staker2.address)
-  }
-
-
   const calcSpankPoints = (periods, stake) => {
     return (((periods * 5) + 40) * stake) / 100
   }
