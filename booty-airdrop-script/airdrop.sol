@@ -1,4 +1,4 @@
-pragma solidity 0.4.24;
+pragma solidity 0.6.8;
 
 import "./OZ_Ownable.sol";
 import {MintAndBurnToken} from "./MintAndBurnToken.sol";

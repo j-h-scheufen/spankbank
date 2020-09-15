@@ -1,4 +1,4 @@
-pragma solidity 0.4.24;
+pragma solidity 0.6.8;
 
 import "./StandardToken.sol";
 import "./OZ_Ownable.sol";
@@ -37,9 +37,9 @@ contract MintAndBurnToken is StandardToken, Ownable {
     string public version = 'H0.1';       //human 0.1 standard. Just an arbitrary versioning scheme.
 
     constructor(
-        string _tokenName,
+        string memory _tokenName,
         uint8 _decimalUnits,
-        string _tokenSymbol
+        string memory _tokenSymbol
         ) public {
         name = _tokenName;                                   // Set the name for display purposes
         decimals = _decimalUnits;                            // Amount of decimals for display purposes

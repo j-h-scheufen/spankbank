@@ -1,4 +1,4 @@
-pragma solidity 0.4.24;
+pragma solidity 0.6.8;
 import {SafeMath} from "./SafeMath.sol";
 import {HumanStandardToken} from "./HumanStandardToken.sol";
 import {MintAndBurnToken} from "./MintAndBurnToken.sol";
@@ -173,16 +173,16 @@ contract SpankBank {
         uint256 _maxPeriods,
         address spankAddress,
         uint256 initialBootySupply,
-        string bootyTokenName,
+        string memory bootyTokenName,
         uint8 bootyDecimalUnits,
-        string bootySymbol
+        string memory bootySymbol
     )   public {
         periodLength = _periodLength;
         maxPeriods = _maxPeriods;
         spankToken = HumanStandardToken(spankAddress);
         bootyToken = new MintAndBurnToken(bootyTokenName, bootyDecimalUnits, bootySymbol);
         if (initialBootySupply > 0) {
-            bootyToken.mint(this, initialBootySupply);
+            bootyToken.mint(address(this), initialBootySupply);
         }
 
         uint256 startTime = now;
@@ -238,7 +238,7 @@ contract SpankBank {
         require(spankAmount > 0, "stake is 0"); // stake must be greater than 0
 
         // transfer SPANK to this contract - assumes sender has already "allowed" the spankAmount
-        require(spankToken.transferFrom(stakerAddress, this, spankAmount));
+        require(spankToken.transferFrom(stakerAddress, address(this), spankAmount));
 
         // a Staker cannot exist without at least one stake, so we use that to detect a new Staker to be created
         if (stakers[stakerAddress].stakes.length == 0) {
@@ -299,12 +299,12 @@ contract SpankBank {
         stk.lastAppliedToPeriod = currentPeriod; // mark stake as having been used for this period
     }
 
-    function receiveApproval(address from, uint256 amount, address tokenContract, bytes extraData) SpankBankIsOpen public returns (bool success) {
+    function receiveApproval(address from, uint256 amount, address tokenContract, bytes memory extraData) SpankBankIsOpen public returns (bool success) {
         require(msg.sender == address(spankToken), "invalid receiveApproval caller");
 
         address delegateKeyFromBytes = extraData.toAddress(12);
         address bootyBaseFromBytes = extraData.toAddress(44);
-        uint256 periodFromBytes = extraData.toUint(64);
+        uint256 periodFromBytes = extraData.toUint256(64);
 
         emit ReceiveApprovalEvent(from, tokenContract);
 
@@ -325,7 +325,7 @@ contract SpankBank {
         updatePeriod();
 
         require(bootyAmount > 0, "fee is zero"); // fees must be greater than 0
-        require(bootyToken.transferFrom(msg.sender, this, bootyAmount));
+        require(bootyToken.transferFrom(msg.sender, address(this), bootyAmount));
 
         bootyToken.burn(bootyAmount);
 
@@ -359,7 +359,7 @@ contract SpankBank {
 
         if (targetBootySupply > totalBootySupply) {
             uint256 bootyMinted = targetBootySupply - totalBootySupply;
-            bootyToken.mint(this, bootyMinted);
+            bootyToken.mint(address(this), bootyMinted);
             period.bootyMinted = bootyMinted;
             emit MintBootyEvent(targetBootySupply, totalBootySupply);
         }
@@ -395,7 +395,7 @@ contract SpankBank {
      * @param stakeIds - an array of Stake IDs for which the staker would like to check in
      * @param updatedEndingPeriods - an array of updated ending periods matching the indexes of the stakeIds. A 0-value indicates no update for that stake.
      */
-    function checkIn(bytes32[] stakeIds, uint256[] updatedEndingPeriods) SpankBankIsOpen public {
+    function checkIn(bytes32[] memory stakeIds, uint256[] memory updatedEndingPeriods) SpankBankIsOpen public {
         updatePeriod();
 
         address stakerAddress =  stakerByDelegateKey[msg.sender];
@@ -429,7 +429,7 @@ contract SpankBank {
      *
      * @param claimPeriods - an array of periods for which booty is being claimed
      */
-    function claimBooty(uint256[] claimPeriods) public {
+    function claimBooty(uint256[] memory claimPeriods) public {
         updatePeriod();
 
         address stakerAddress = stakerByDelegateKey[msg.sender];
@@ -465,7 +465,7 @@ contract SpankBank {
      * 
      * @param stakeIds an array of Stake IDs for which the stake should be withdrawn
      */
-    function withdrawStake(bytes32[] stakeIds) public {
+    function withdrawStake(bytes32[] memory stakeIds) public {
         updatePeriod();
 
         Staker storage staker = stakers[msg.sender];
@@ -575,7 +575,7 @@ contract SpankBank {
         require(stk.lastAppliedToPeriod < currentPeriod, "stake already applied to current period");
 
         // transfer SPANK to this contract - assumes sender has already "allowed" the amount
-        require(spankToken.transferFrom(msg.sender, this, increaseAmount));
+        require(spankToken.transferFrom(msg.sender, address(this), increaseAmount));
 
         stk.spankStaked = SafeMath.add(stk.spankStaked, increaseAmount);
         stakers[msg.sender].totalSpank = SafeMath.add(stakers[msg.sender].totalSpank, increaseAmount);
@@ -690,7 +690,7 @@ contract SpankBank {
         return stakerByDelegateKey[delegateAddress];
     }
 
-    function getStakeIds(address stakerAddress) public view returns (bytes32[]) {
+    function getStakeIds(address stakerAddress) public view returns (bytes32[] memory) {
         return stakers[stakerAddress].stakes;
     }
 }

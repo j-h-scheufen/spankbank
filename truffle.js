@@ -6,7 +6,7 @@ module.exports = {
 
   compilers: {
     solc: {
-      version: "0.4.24" // A version or constraint - Ex. "^0.5.0
+      version: "0.6.8" // A version or constraint - Ex. "^0.5.0
     }
   },
   networks: {
