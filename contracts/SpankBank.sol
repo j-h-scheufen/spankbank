@@ -72,6 +72,13 @@ contract SpankBank {
         address newBootyBase
     );
 
+    event IncreaseStakeEvent (
+        bytes32 stakeId,
+        address staker,
+        uint256 increaseAmount,
+        uint256 newSpankStaked
+    );
+
     event VoteToCloseEvent (
         address staker,
         uint256 period
@@ -544,6 +551,41 @@ contract SpankBank {
             spankAmount,
             newDelegateKey,
             newBootyBase
+        );
+    }
+
+    /**
+     * @dev Adds the specified amount to the given stake.
+     * Reverts if
+     * - the specified increase is 0
+     * - the transfer of Spank tokens into the SpankBank fails
+     * - the specified stake is expired
+     * - the specified stake was already applied to the current period (via checkIn or stake)
+     *
+     * @param stakeId - the stake to increase
+     * @param increaseAmount - the amount of SPANK to add to the stake
+     */
+    function increaseStake(bytes32 stakeId, uint256 increaseAmount) public {
+        updatePeriod();
+
+        require(increaseAmount > 0, "increaseAmount is zero");
+        Stake storage stk = stakes[stakeId];
+        require(stk.owner == msg.sender, "stake has different owner");
+        require(currentPeriod <= stk.endingPeriod, "stake is expired");
+        require(stk.lastAppliedToPeriod < currentPeriod, "stake already applied to current period");
+
+        // transfer SPANK to this contract - assumes sender has already "allowed" the amount
+        require(spankToken.transferFrom(msg.sender, this, increaseAmount));
+
+        stk.spankStaked = SafeMath.add(stk.spankStaked, increaseAmount);
+        stakers[msg.sender].totalSpank = SafeMath.add(stakers[msg.sender].totalSpank, increaseAmount);
+        totalSpankStaked = SafeMath.add(totalSpankStaked, increaseAmount);
+
+        emit IncreaseStakeEvent(
+            stakeId,
+            msg.sender,
+            increaseAmount,
+            stk.spankStaked
         );
     }
 
